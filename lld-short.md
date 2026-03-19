@@ -1,6 +1,268 @@
-# LLD Handbook — 30 Problems (Quick Reference)
+# LLD Handbook — 30 Problems (Complete Interview Reference)
 
-> Each problem: **Functional Requirements → Entities → Class Diagram → Pattern → Service Layer**
+> Each problem: **Functional Requirements → Entities → Class Diagram → Pattern → Key Code → Service Layer → Interview Tips**
+
+---
+
+# PART 0 · How to Approach LLD in Interviews (The 10-Minute Framework)
+
+## Step-by-Step (follow this EVERY time)
+
+| Min | Step | What to Do |
+|-----|------|-----------|
+| 0-2 | **Clarify** | Ask 3-5 questions. Scope it down. "Do we need multi-threading?" "Single or multi-server?" "Payment needed?" |
+| 2-4 | **Requirements** | List 5-7 functional requirements. Write them on the board. Get interviewer's nod. |
+| 4-5 | **Entities** | Identify core nouns → these become your classes. |
+| 5-7 | **Class Diagram** | Draw entities + relationships. Show key attributes + methods. Identify interfaces. |
+| 7-9 | **Code** | Write the core classes + one service method. Use design patterns where natural. |
+| 9-10 | **Extend** | Mention how you'd handle: concurrency, scaling, persistence, edge cases. |
+
+## Clarification Questions Cheat Sheet (ask these!)
+- **Users**: How many concurrent users? Single or multi-tenant?
+- **Scale**: In-memory only? Or persist to DB?
+- **Concurrency**: Multi-threaded access? Locking strategy?
+- **Scope**: Which features are must-have vs nice-to-have?
+- **Real-time**: Do we need notifications / live updates?
+
+## Red Flags (avoid these)
+- ❌ Jumping to code without requirements
+- ❌ Using design patterns just to show off (use them when they FIT)
+- ❌ Ignoring edge cases when asked
+- ❌ God class / putting everything in one class
+- ❌ Public fields everywhere / no encapsulation
+- ❌ Tight coupling between classes
+
+## Green Flags (interviewer loves these)
+- ✅ Start with requirements, get confirmation
+- ✅ Identify the right pattern and explain WHY
+- ✅ Program to interfaces, not implementations
+- ✅ Mention thread safety where relevant
+- ✅ Discuss trade-offs (e.g., "I chose Strategy over if-else because...")
+- ✅ Bring up edge cases proactively
+
+---
+
+# PART 0.5 · SOLID Principles (Reference Every Problem Against These)
+
+| Principle | Rule | Example |
+|-----------|------|---------|
+| **S** — Single Responsibility | Each class does ONE thing | `ParkingSpot` only manages spot state; `FeeStrategy` only calculates fees |
+| **O** — Open/Closed | Open for extension, closed for modification | Add `SurgeFareStrategy` without changing `RideService` |
+| **L** — Liskov Substitution | Subclass must be usable wherever parent is used | Any `Vehicle` subclass works with `ParkingSpot.canFit(Vehicle)` |
+| **I** — Interface Segregation | Don't force classes to implement unused methods | `Readable` and `Writable` interfaces instead of one fat `FileOperations` |
+| **D** — Dependency Inversion | Depend on abstractions, not concretions | `BookingService` depends on `PaymentStrategy` interface, not `CardPayment` directly |
+
+### Quick SOLID Violations to Watch For
+```
+❌ class OrderService { // does ordering, payment, notification, inventory → violates S
+❌ if (type == "CARD") ... else if (type == "UPI") ... → violates O (add new type = modify code)
+❌ class Square extends Rectangle { setWidth() { also sets height } } → violates L
+❌ interface Worker { work(); eat(); sleep(); } → violates I for robots
+❌ class ReportGenerator { MySQLDatabase db = new MySQLDatabase(); } → violates D
+```
+
+---
+
+# PART 1 · Design Patterns Deep Dive
+
+## Pattern 1: Singleton
+**When**: Exactly one instance needed globally (DB connection pool, Logger, Config)
+**Watch out**: Makes unit testing harder. Consider DI as alternative.
+```java
+public class Singleton {
+    private static volatile Singleton instance;       // volatile for thread safety
+    private Singleton() {}                             // private constructor
+    public static Singleton getInstance() {
+        if (instance == null) {                        // first check (no lock)
+            synchronized (Singleton.class) {
+                if (instance == null) {                // second check (with lock)
+                    instance = new Singleton();
+                }
+            }
+        }
+        return instance;
+    }
+}
+```
+**Interview tip**: Always use double-checked locking + `volatile`. Explain why both checks are needed.
+
+---
+
+## Pattern 2: Strategy
+**When**: Multiple algorithms that are interchangeable at runtime.
+**Red flag to use it**: You see `if-else` or `switch` on type to choose behavior.
+```java
+// Instead of:
+if (payType == "CARD") { ... }
+else if (payType == "UPI") { ... }
+
+// Use:
+interface PaymentStrategy { void pay(double amount); }
+class CardPayment implements PaymentStrategy { ... }
+class UPIPayment implements PaymentStrategy { ... }
+
+// Client just calls:
+paymentStrategy.pay(amount); // strategy injected at runtime
+```
+**SOLID link**: Satisfies Open/Closed — add new strategy without modifying existing code.
+
+---
+
+## Pattern 3: State
+**When**: Object behavior changes based on its internal state. You see a state machine.
+**Red flag to use it**: Multiple `if (state == X)` scattered in methods.
+```java
+interface State {
+    void handle(Context ctx);
+}
+class IdleState implements State {
+    void handle(Context ctx) {
+        // do idle stuff
+        ctx.setState(new ActiveState()); // transition
+    }
+}
+```
+**Key**: State transitions are defined INSIDE state classes, not in the main class.
+
+---
+
+## Pattern 4: Observer
+**When**: One-to-many dependency. When one object changes, all dependents are notified.
+```java
+interface Observer { void update(Event event); }
+interface Observable {
+    void subscribe(Observer o);
+    void unsubscribe(Observer o);
+    void notifyAll(Event e);
+}
+class EventSource implements Observable {
+    List<Observer> observers = new ArrayList<>();
+    void notifyAll(Event e) { observers.forEach(o -> o.update(e)); }
+}
+```
+**Use in**: Notifications, live feeds, real-time updates, waitlists
+
+---
+
+## Pattern 5: Chain of Responsibility
+**When**: Request passes through a chain of handlers. Each handler decides: process or forward.
+```java
+abstract class Handler {
+    Handler next;
+    void handle(Request req) {
+        if (canHandle(req)) process(req);
+        else if (next != null) next.handle(req);
+    }
+    abstract boolean canHandle(Request req);
+    abstract void process(Request req);
+}
+```
+**Use in**: Logger (level filtering), ATM (cash denominations), Middleware, Validation chains
+
+---
+
+## Pattern 6: Factory
+**When**: Create objects without exposing creation logic. Caller doesn't know concrete class.
+```java
+class ChannelFactory {
+    static NotificationChannel create(ChannelType type) {
+        return switch (type) {
+            case EMAIL -> new EmailChannel();
+            case SMS   -> new SMSChannel();
+            case PUSH  -> new PushChannel();
+        };
+    }
+}
+```
+
+---
+
+## Pattern 7: Composite
+**When**: Part-whole hierarchies (tree structures). Treat individual and group objects uniformly.
+```java
+abstract class Entry { abstract int getSize(); }
+class File extends Entry { int getSize() { return content.length(); } }
+class Directory extends Entry {
+    List<Entry> children;
+    int getSize() { return children.stream().mapToInt(Entry::getSize).sum(); }
+}
+```
+**Use in**: File system, UI components, Org chart
+
+---
+
+## Pattern 8: Mediator
+**When**: Many objects communicate with each other → centralize via mediator to reduce coupling.
+```java
+class ChatMediator {
+    void sendMessage(User sender, String msg, Group group) {
+        group.getMembers().stream()
+            .filter(u -> !u.equals(sender))
+            .forEach(u -> u.receive(msg));
+    }
+}
+```
+
+---
+
+## Pattern 9: Command
+**When**: Encapsulate a request as an object. Supports undo, queuing, logging.
+```java
+interface Command { void execute(); void undo(); }
+class PlaceOrderCommand implements Command {
+    void execute() { orderBook.add(order); }
+    void undo() { orderBook.remove(order); }
+}
+```
+**Use in**: Stock orders, text editor undo/redo, macro recording
+
+---
+
+# PART 1.5 · Common Building Blocks (Reusable Across Problems)
+
+### Payment Module
+```java
+interface PaymentStrategy { boolean pay(double amount); }
+class CardPayment implements PaymentStrategy { ... }
+class UPIPayment implements PaymentStrategy { ... }
+class WalletPayment implements PaymentStrategy { ... }
+// → Used in: BookMyShow, Shopping Cart, Food Delivery, Hotel, Ride Sharing, Concert
+```
+
+### Location / Distance
+```java
+class Location {
+    double lat, lng;
+    double distanceTo(Location other) {
+        return Math.sqrt(Math.pow(lat-other.lat,2) + Math.pow(lng-other.lng,2));
+    }
+}
+// → Used in: Food Delivery, Ride Sharing, Amazon Locker
+```
+
+### Notification Module
+```java
+interface NotificationChannel { void send(String userId, String msg); }
+// → Used in: BookMyShow, Food Delivery, Hotel, Amazon Locker, Concert, Task Mgmt
+```
+
+### Observer Module
+```java
+interface Observer<T> { void onEvent(T event); }
+interface Observable<T> {
+    void subscribe(Observer<T> o);
+    void unsubscribe(Observer<T> o);
+    void notifyObservers(T event);
+}
+// → Used in: 15+ problems
+```
+
+### Status / State Machine
+```java
+enum Status { CREATED, ACTIVE, COMPLETED, CANCELLED }
+// Common pattern: can only transition forward (or to CANCELLED)
+// → Used in: Orders, Rides, Bookings, Tasks, Loans
+```
 
 ---
 
@@ -97,6 +359,15 @@ public class ParkingLot {
 }
 ```
 
+### 🎯 Interview Tips
+- **Why Strategy?** "Fee calculation varies — hourly, flat, dynamic. Strategy lets us swap without touching ParkingLot."
+- **Why Singleton?** "Only one parking lot instance system-wide. But mention DI as alternative."
+- **Follow-up: Concurrency** — Multiple vehicles entering simultaneously → `synchronized` on `findAvailableSpot()` or use `ConcurrentHashMap` for spot status
+- **Follow-up: Nearest spot** — BFS from entrance or maintain a sorted data structure per floor
+- **Edge cases**: Lot full, vehicle already parked, invalid ticket, power failure mid-transaction
+- **Design decision**: Vehicle → Spot compatibility as a method in `ParkingSpot.canFit(Vehicle)` keeps logic close to data
+- **Extend**: EV charging spots, reserved/VIP spots, multi-entry/exit gates
+
 ---
 
 ## 2 · Logger System 🟢
@@ -146,6 +417,14 @@ public abstract class LogHandler {
 }
 ```
 
+### 🎯 Interview Tips
+- **Why Chain of Responsibility?** "Each handler decides if it processes the log AND forwards to next. Adding a new level/sink doesn't change existing handlers → Open/Closed."
+- **Thread safety**: Use `volatile` for singleton + double-checked locking. Log writes should be thread-safe (synchronized or use a ConcurrentLinkedQueue buffer).
+- **Follow-up: Async logging** — Use a blocking queue + dedicated writer thread to avoid log calls blocking the main thread
+- **Follow-up: Log rotation** — FileHandler can rotate by size/date
+- **Edge cases**: Null handler chain, log in extremely hot path (perf), circular chain
+- **Real-world**: SLF4J, Log4j use similar patterns. Mention this familiarity.
+
 ---
 
 ## 3 · Vending Machine 🟢
@@ -190,6 +469,14 @@ public interface State {
     void returnChange(VendingMachine vm);
 }
 ```
+
+### 🎯 Interview Tips
+- **Why State pattern?** "Each state has different behavior for the same action (insertMoney, selectProduct). Without State pattern, you'd have messy if-else chains in every method."
+- **State transition diagram** — Draw this first! Idle → HasMoney → Dispensing → ReturnChange → Idle
+- **Follow-up: Concurrency** — Two users at the same machine? Unlikely physically, but in code, make state transitions atomic.
+- **Edge cases**: Out of stock after money inserted, exact change only, multiple products in one session, coin jam
+- **Design decision**: States hold no data — VendingMachine holds balance/selectedProduct. States just define behavior.
+- **Extend**: Support multiple currencies, card payment, admin dashboard
 
 ---
 
@@ -236,6 +523,14 @@ public class Question {
 }
 ```
 
+### 🎯 Interview Tips
+- **Votable interface** — Both Question and Answer support voting → extract a `Votable` interface for DRY
+- **Reputation system**: Upvote on answer = +10 rep, upvote on question = +5, accepted answer = +15. Track this on User.
+- **Follow-up: Search** — By title, body, tag. Mention inverted index for full-text search.
+- **Follow-up: Ranking** — Sort answers by votes, with accepted answer pinned at top.
+- **Edge cases**: Self-voting, duplicate questions, edit history, spam detection
+- **Concurrency**: Vote counts under concurrent upvotes → use AtomicInteger or synchronized
+
 ---
 
 ## 5 · Library Management 🟢
@@ -279,6 +574,14 @@ public class LibraryService {
 }
 ```
 
+### 🎯 Interview Tips
+- **Book vs BookItem**: Book is metadata (ISBN, title). BookItem is a physical copy (barcode). One Book can have many BookItems. This is the key design insight.
+- **Reservation queue**: When a book is returned, check reservation queue → auto-fulfill the first waiting reservation.
+- **Follow-up**: Fine calculation = (daysPastDue × finePerDay). Cap at book price.
+- **Edge cases**: Renewing a loan, lost book, member with outstanding fines trying to borrow, reservation expiry
+- **Concurrency**: Two members trying to borrow the last copy → lock on BookItem
+- **Extend**: Multi-branch library, inter-library loan, digital books
+
 ---
 
 ## 6 · Tic-Tac-Toe 🟢
@@ -319,6 +622,13 @@ public class Board {
 }
 ```
 
+### 🎯 Interview Tips
+- **Win check optimization**: Only check row/col/diagonals that include the last placed piece — O(n) instead of O(n²)
+- **Follow-up: NxN board** — Generalize to NxN. Win condition = N in a row.
+- **Follow-up: Bot player** — Strategy pattern for player (HumanPlayer, BotPlayer). Bot uses minimax.
+- **Edge cases**: Place on occupied cell, play after game over
+- **Design decision**: Piece as enum (X, O) or class? Enum is simpler here — use class only if pieces have behavior.
+
 ---
 
 ## 7 · Traffic Signal System 🟢
@@ -357,6 +667,13 @@ public interface SignalState {
     String getColor();
 }
 ```
+
+### 🎯 Interview Tips
+- **State Pattern fits perfectly**: Green → Yellow → Red → Green. Each state knows its duration and its next state.
+- **Controller coordination**: When road A is green, all other roads must be red. Controller orchestrates.
+- **Follow-up: Emergency override** — Force one road to green, all others to red. Return to normal cycle after.
+- **Edge cases**: Sensor malfunction, stuck in one state, pedestrian signal, left-turn signals
+- **Concurrency**: Use `ScheduledExecutorService` for timed transitions
 
 ---
 
@@ -410,6 +727,15 @@ public class NearestElevatorScheduler implements Scheduler {
 }
 ```
 
+### 🎯 Interview Tips
+- **Three patterns, three concerns**: Strategy (which elevator?), State (elevator behavior), Observer (floor display updates)
+- **SCAN Algorithm**: Serve all requests in current direction before reversing — like a disk arm. Use two TreeSets (upStops, downStops).
+- **Follow-up: Scheduling Strategies** — Nearest, Zone-based (elevators assigned to floor ranges), Load-balanced
+- **Follow-up: VIP/freight elevator** — Separate scheduling pool
+- **Concurrency**: Multiple floor buttons pressed simultaneously → thread-safe request queue (PriorityBlockingQueue)
+- **Edge cases**: All elevators busy, maintenance mode, overweight, door obstruction
+- **Data Structure**: TreeSet for stops (sorted, O(log n) insert/remove), or PriorityQueue
+
 ---
 
 ## 9 · In-Memory Key-Value Store 🟡
@@ -448,6 +774,14 @@ public class KVStore {
     public void delete(String key) { ... }
 }
 ```
+
+### 🎯 Interview Tips
+- **TTL eviction strategies**: Lazy (check on GET) vs Active (background thread scans periodically) vs Both (hybrid like Redis)
+- **Thread safety**: `ConcurrentHashMap` for O(1) thread-safe ops. But compound operations (check-then-act) need synchronization.
+- **Follow-up: Snapshots** — Copy-on-write Map for consistent snapshots without locking readers
+- **Follow-up: Persistence** — Append-only log (AOF) or periodic RDB-style dump
+- **Edge cases**: Key expiry during read (lazy cleanup), snapshot during writes, max memory limit
+- **Think Redis**: If interviewer says "design Redis", use this as base + add data structures (List, Set, SortedSet)
 
 ---
 
@@ -501,6 +835,15 @@ public class LRUCache<K, V> {
 }
 ```
 
+### 🎯 Interview Tips
+- **Key insight**: HashMap gives O(1) lookup, DLL gives O(1) move-to-front and remove-last. Together → O(1) for everything.
+- **Dummy nodes**: Use dummy head + dummy tail in DLL to avoid null checks on insert/remove.
+- **Follow-up: Thread-safe LRU** — Use `ReadWriteLock` or `synchronized` on get/put. Or `ConcurrentLinkedHashMap`.
+- **Follow-up: LFU Cache** — Maintain frequency count per key + min-frequency tracking
+- **Follow-up: TTL support** — Add expiry time to Node, lazy evict on get()
+- **Edge cases**: Capacity = 0, update existing key value, remove from empty cache
+- **Why not LinkedHashMap?** In interview, they want to see you build it. But mention Java's `LinkedHashMap(capacity, 0.75f, true)` with `removeEldestEntry()` as production shortcut.
+
 ---
 
 ## 11 · Movie Ticket Booking (BookMyShow) 🟡
@@ -542,6 +885,14 @@ public class BookingService {
     }
 }
 ```
+
+### 🎯 Interview Tips
+- **Seat locking is the CORE challenge**: Temporary hold (5 min) prevents double-booking. Use `ScheduledExecutorService` for auto-release.
+- **Concurrency**: `synchronized` block on seat locking — two users clicking the same seat at the same time. Use optimistic locking or `compareAndSet`.
+- **Follow-up: Seat map** — Show available vs locked vs booked in real-time (Observer pattern to push updates)
+- **Follow-up: Dynamic pricing** — Price varies by showtime, day (weekend), seat fill rate
+- **Edge cases**: Payment fails after locking → must release. User closes browser mid-booking. Show cancelled.
+- **Design decision**: Show holds the seat status map (not individual Seat objects) for centralized locking.
 
 ---
 
@@ -593,6 +944,15 @@ public class Knight extends Piece {
 }
 ```
 
+### 🎯 Interview Tips
+- **Polymorphism over Strategy here**: Each piece IS a different type with different `canMove()`. This is natural polymorphism.
+- **Path blocking**: Rook/Bishop/Queen need `isPathClear()` — iterate step-by-step between from → to checking for obstacles. Knight JUMPS (no path check).
+- **Follow-up: Check/Checkmate** — After each move, check if opponent's King is under attack. Checkmate = King in check + no legal moves.
+- **Follow-up: Castling, En Passant** — Special move rules. Track if King/Rook have moved.
+- **Follow-up: Undo** — Store Move objects in a stack. Move stores killedPiece for restoration.
+- **Edge cases**: Move into check (illegal), stalemate (not in check but no legal moves), pawn promotion
+- **Design decision**: Board.isPathClear() utility used by Rook, Bishop, Queen — avoids duplication.
+
 ---
 
 ## 13 · Snake & Ladder 🟡
@@ -641,6 +1001,13 @@ public class Game {
     }
 }
 ```
+
+### 🎯 Interview Tips
+- **Board design**: Use `Map<Integer, Integer>` for both snakes (head→tail) and ladders (bottom→top). `getFinalPosition()` checks both maps.
+- **Queue for players**: Natural turn-order with `poll()` and `offer()`.
+- **Follow-up**: Configurable — board size, number of dice, number of snakes/ladders all parameterized.
+- **Edge cases**: Roll exceeds board → stay in place. Snake at position 99 (near end). Snake and ladder at same cell (invalid config).
+- **Extend**: Power-ups, multiple dice, reverse movement
 
 ---
 
@@ -693,6 +1060,14 @@ public abstract class CashHandler {
 }
 ```
 
+### 🎯 Interview Tips
+- **Two patterns, two problems**: State = ATM flow (insert card → enter PIN → transact). Chain of Resp = cash dispensing (₹500 → ₹200 → ₹100).
+- **Cash handler tracks available notes**: Each handler has a `count` field. Dispense `min(needed, available)`, forward remainder.
+- **Follow-up: Max withdrawal limit** per transaction, daily limit per account
+- **Follow-up: Multiple card types** — credit vs debit → different transaction rules
+- **Edge cases**: Wrong PIN (3 attempts → block card), cash insufficient in ATM, power failure mid-transaction, partial dispense
+- **Concurrency**: ATM is physically single-user, but bank backend needs concurrency (account balance)
+
 ---
 
 ## 15 · Online Shopping Cart 🟡
@@ -744,6 +1119,14 @@ public class CheckoutService {
 }
 ```
 
+### 🎯 Interview Tips
+- **Cart is a temporary object** — Order is the permanent record. Cart → Order at checkout.
+- **Coupon validation**: Check expiry, usage limits, min order value. Strategy pattern for different discount types (flat, percent, BOGO).
+- **Follow-up: Inventory management** — Deduct stock on order, return on cancel. Use pessimistic locking for hot items.
+- **Follow-up: Order states** — PLACED → CONFIRMED → SHIPPED → DELIVERED → (optional CANCELLED/RETURNED)
+- **Concurrency**: Flash sale — 100 people buying last 1 item. Use `synchronized` or database-level optimistic locking.
+- **Edge cases**: Empty cart checkout, coupon already used, item out of stock between add-to-cart and checkout
+
 ---
 
 ## 16 · Food Delivery (Swiggy/Zomato) 🟡
@@ -788,6 +1171,15 @@ public class OrderService {
 }
 ```
 
+### 🎯 Interview Tips
+- **Two Strategy decisions**: (1) Agent assignment (nearest, round-robin, load-balanced). (2) Payment method.
+- **Order status is key**: Placed → Preparing → PickedUp → Delivered. Each transition notifies all observers (user, restaurant, agent dashboard).
+- **Follow-up: ETA calculation** — Based on distance + preparation time.
+- **Follow-up: Restaurant ranking** — By distance, rating, delivery time, promoted listings.
+- **Concurrency**: Multiple orders competing for same agent → lock on agent.isAvailable check.
+- **Edge cases**: Restaurant closes mid-order, agent cancels, no agents available (queue order), user cancels after preparing started (partial refund)
+- **Design decision**: Cart restricted to one restaurant. Multi-restaurant = multiple orders.
+
 ---
 
 ## 17 · Hotel Booking 🟡
@@ -826,6 +1218,14 @@ public class BookingService {
     }
 }
 ```
+
+### 🎯 Interview Tips
+- **Room availability is a DATE RANGE problem**: `isAvailable(checkIn, checkOut)` = no existing booking overlaps with this range. Overlap: `newCheckIn < existingCheckOut && newCheckOut > existingCheckIn`.
+- **Pricing Strategy**: StandardPricing vs PeakSeasonPricing vs WeekendPricing. Swap at runtime.
+- **Follow-up: Overbooking** — Some hotels overbook by 5-10%. Handle spillover to partner hotel.
+- **Follow-up: Cancellation policy** — Full refund >7 days, 50% 3-7 days, no refund <3 days.
+- **Edge cases**: Check-in at 2PM, checkout at 11AM (partial day), room upgrade, extending stay
+- **Concurrency**: Two users booking same room for same dates → first-come-first-served with locking.
 
 ---
 
@@ -872,6 +1272,14 @@ public class Directory extends Entry {
     public void addEntry(Entry e) { children.put(e.getName(), e); e.parent = this; }
 }
 ```
+
+### 🎯 Interview Tips
+- **Composite is THE pattern here**: File and Directory both extend Entry. Directory contains Entry children (which can be File or Directory). `getSize()` is recursive.
+- **pwd() implementation**: Walk up parent chain to root → build path string. Use `getFullPath()` recursive method.
+- **Follow-up: Path resolution** — Handle absolute paths ("/a/b/c") and relative ("../b"). Split by "/" and navigate.
+- **Follow-up: Permissions** — Read/Write/Execute per entry per user. Check on every operation.
+- **Edge cases**: Circular symlinks, delete dir with contents (recursive), file name conflicts, max depth
+- **Design decision**: `children` as `Map<String, Entry>` gives O(1) lookup by name. LinkedHashMap preserves insert order.
 
 ---
 
@@ -921,6 +1329,15 @@ public class NotificationService {
 }
 ```
 
+### 🎯 Interview Tips
+- **Three patterns, three concerns**: Strategy (which channel), Factory (create channel), Observer (users subscribe to topics).
+- **Template rendering**: `"Hello {name}, your order {orderId} is {status}"` → replace placeholders with params map.
+- **Retry with backoff**: On failure, retry with exponential backoff (1s, 2s, 4s, 8s...) up to MAX_RETRIES.
+- **Follow-up: Priority queue** — CRITICAL notifications skip the queue. Use PriorityBlockingQueue.
+- **Follow-up: DND/Rate limiting** — Don't spam users. Max 3 notifications per hour per user.
+- **Edge cases**: Channel failure (SMS provider down → fallback to email), user without email, template missing
+- **Concurrency**: High throughput → use async processing with thread pool + message queue.
+
 ---
 
 ## 20 · Chat Application 🟡
@@ -958,6 +1375,15 @@ public class ChatMediator {
     }
 }
 ```
+
+### 🎯 Interview Tips
+- **Mediator is key here**: Users don't communicate directly. ChatMediator routes messages → reduces N×N connections to N×1.
+- **Message status flow**: SENT → DELIVERED (server received, user online) → READ (user opened). Track per-message.
+- **Follow-up: Offline messages** — Store in queue, deliver when user comes online.
+- **Follow-up: Typing indicator** — Broadcast "user X is typing" to other participants. Debounce to avoid spam.
+- **Follow-up: Group admin features** — Add/remove members, promote admin, group settings.
+- **Concurrency**: Multiple messages in same conversation simultaneously. Message ordering → use timestamp + sequence number.
+- **Edge cases**: User blocked by another, max group size, message size limits, media upload failures
 
 ---
 
@@ -1011,6 +1437,15 @@ public class JobScheduler {
 }
 ```
 
+### 🎯 Interview Tips
+- **PriorityBlockingQueue is the backbone**: Jobs sorted by (scheduledTime, priority). `take()` blocks when empty.
+- **Recurring jobs**: After completion, calculate next occurrence and re-submit to queue.
+- **Follow-up: Cron expression** — Parse "0/5 * * * *" → next execution time. Use a CronExpression parser.
+- **Follow-up: Job dependencies** — Job B runs only after Job A completes. DAG-based scheduling.
+- **Concurrency**: Thread pool size is configurable. Separate scheduler thread from worker threads.
+- **Edge cases**: Job throws exception → catch, mark FAILED, don't crash scheduler. Job takes too long → timeout.
+- **Design decision**: `isReady()` checks `System.currentTimeMillis() >= scheduledTime`. Not-ready jobs go back to queue.
+
 ---
 
 ## 22 · Rate Limiter 🟡
@@ -1051,6 +1486,17 @@ public class TokenBucketStrategy implements RateLimitStrategy {
     }
 }
 ```
+
+### 🎯 Interview Tips
+- **Know all 3 algorithms deeply**:
+  - **Fixed Window**: Simple counter per time window. Problem: burst at window boundary.
+  - **Sliding Window Log**: Track timestamp of each request. Remove old ones. Precise but memory-heavy.
+  - **Token Bucket**: Tokens refill at constant rate. Each request consumes a token. Allows controlled bursts. **Most commonly asked.**
+- **Token Bucket math**: `tokensToAdd = (now - lastRefill) / refillInterval`. Cap at maxTokens.
+- **Follow-up: Distributed rate limiter** — Use Redis with `INCR` + `EXPIRE` (Fixed Window) or Redis Sorted Sets (Sliding Window).
+- **Follow-up: Per-API config** — Different limits for different endpoints. Map<apiPath, RateLimitConfig>.
+- **Concurrency**: `synchronized` block inside `tryConsume()` per client. Or use `AtomicLong` for token count.
+- **Edge cases**: Clock skew in distributed systems, sudden traffic spike, whitelist IPs
 
 ---
 
@@ -1098,6 +1544,14 @@ public class ExpenseService {
     }
 }
 ```
+
+### 🎯 Interview Tips
+- **Three split types, one Strategy**: Equal (amount / N), Exact (user provides each share), Percent (user provides %). Validate: shares must add up to total.
+- **Balance sheet design**: `Map<userId, Map<userId, Double>>` where `balances[A][B] > 0` means A owes B. Simplify by netting: if A owes B ₹100 and B owes A ₹30, net = A owes B ₹70.
+- **Follow-up: Minimize transactions** — Settle debts with minimum number of transfers. This is an NP-hard problem; greedy works for simple cases (match max creditor with max debtor).
+- **Follow-up: Multi-currency** — Convert to base currency using exchange rates.
+- **Edge cases**: Expense with only one person (self-expense), 0 amount split, person not in group, rounding errors (use `BigDecimal` in production)
+- **Concurrency**: Two expenses added to same group simultaneously → synchronize balance updates.
 
 ---
 
@@ -1151,6 +1605,15 @@ public class RideService {
 }
 ```
 
+### 🎯 Interview Tips
+- **This is a pattern-heavy problem — use 3 patterns**: Strategy (fare + driver matching), State (ride lifecycle), Observer (live tracking). Explain WHY each.
+- **Surge pricing**: `SurgeFareStrategy` wraps a base strategy with a multiplier. Decorator-like. Triggered by demand/supply ratio.
+- **State transitions**: REQUESTED → ACCEPTED → IN_PROGRESS → COMPLETED. Each state validates what transitions are allowed. Cannot complete from REQUESTED.
+- **Follow-up: Driver matching** — Beyond nearest: consider driver rating, acceptance rate, vehicle type.
+- **Follow-up: ETA** — Based on distance + traffic. Update in real-time.
+- **Concurrency**: Multiple riders requesting same driver → only one should get matched. Lock on `driver.isAvailable`.
+- **Edge cases**: Driver rejects → re-match. Both cancel at same time. GPS inaccuracy. Driver goes offline mid-ride.
+
 ---
 
 ## 25 · Cricket Scorecard (CricInfo) 🔴
@@ -1194,6 +1657,15 @@ public class MatchService {
     }
 }
 ```
+
+### 🎯 Interview Tips
+- **Entity hierarchy matters**: Match → Innings → Over → Ball. Each level aggregates stats from the level below.
+- **Extras handling**: Wide/No-ball → runs counted but ball NOT counted in over (re-bowl). `isLegalDelivery()` check.
+- **Strike rate**: `(runs × 100) / ballsFaced`. Economy: `runsConceded / oversBowled`.
+- **Follow-up: Live updates** — Observer pattern pushes scorecard to all connected displays/apps on every ball.
+- **Follow-up: Match types** — ODI (50 overs), T20 (20 overs), Test (unlimited overs, 2 innings each). Configurable.
+- **Edge cases**: Super over, DLS method (rain), batsman retired hurt, bowler max overs in limited format
+- **Design decision**: Separate BatsmanScore and BowlerScore classes keep stats clean + independently testable.
 
 ---
 
@@ -1241,6 +1713,15 @@ public class ConnectionService {
     }
 }
 ```
+
+### 🎯 Interview Tips
+- **This is the most entity-rich problem**: User, Profile, Connection, Post, Comment, Job, Application, Message. Start with User → Profile, then expand.
+- **Connection is bidirectional**: Accept → both users add each other. Use a Connection entity with status.
+- **Feed algorithm**: Start simple (reverse-chronological from connections). Mention weighted ranking (engagement, relevance) as extension.
+- **Follow-up: Job recommendation** — Match user skills to job requiredSkills. Score by overlap.
+- **Follow-up: "People you may know"** — 2nd degree connections (friends of friends). Graph BFS.
+- **Edge cases**: Withdraw pending request, block user, connection limit, post visibility (public/connections-only)
+- **Design decision**: Separate services for each concern — FeedService, ConnectionService, JobService, MessagingService.
 
 ---
 
@@ -1303,6 +1784,15 @@ public class LockerService {
 }
 ```
 
+### 🎯 Interview Tips
+- **Size matching is the core algorithm**: Assign smallest locker that fits the package → minimize waste. Strategy pattern for different assignment policies.
+- **OTP security**: 6-digit random, expires in 3 days. After expiry → return to sender, locker freed.
+- **State transitions**: Available → Occupied (package delivered) → Available (picked up) or Expired (3 days)
+- **Follow-up: Return package** — User drops off return in locker. Assign locker, generate return label.
+- **Follow-up: Multi-package** — One customer, multiple packages → multiple lockers with same OTP? Or one large locker?
+- **Concurrency**: Two packages assigned to same locker → lock on locker.isAvailable check.
+- **Edge cases**: All lockers full at a location, wrong OTP, expired OTP, package too large for any locker
+
 ---
 
 ## 28 · Concert Ticket System 🔴
@@ -1350,6 +1840,15 @@ public class TicketService {
     }
 }
 ```
+
+### 🎯 Interview Tips
+- **Similar to BookMyShow but with**: Dynamic pricing + waitlist. Two extra dimensions of complexity.
+- **Demand-based pricing**: More seats sold → higher price for remaining. `DemandBasedPricing` checks available count: <50 left = 2x, <200 = 1.5x.
+- **Waitlist with Observer**: When seats released (cancellation/hold expiry), notify first person on waitlist for that category.
+- **Follow-up: Bulk booking** — Lock N seats atomically. All-or-nothing (no partial booking).
+- **Follow-up: Refund tiers** — >7 days = 100%, 3-7 = 50%, <3 = 0%. Based on event date minus cancel date.
+- **Concurrency**: Heavy concurrency during ticket drops (10K users, 500 seats). Queue-based or `synchronized` seat holding.
+- **Edge cases**: Event cancelled → full refund all. Venue changed. Date rescheduled.
 
 ---
 
@@ -1406,6 +1905,16 @@ public class MatchingEngine {
 }
 ```
 
+### 🎯 Interview Tips
+- **Order Book is the heart**: Per stock: buy orders in MaxHeap (highest price first), sell orders in MinHeap (lowest price first). Match when `bestBuy >= bestSell`.
+- **Price-Time Priority**: Same price → earlier order gets matched first. Use `Comparable` with price + timestamp.
+- **Partial fills**: Buy 100 shares, only 60 available → fill 60, keep remaining 40 in order book.
+- **Follow-up: Market vs Limit orders** — Market = execute at best available price (always matches). Limit = only at specified price or better.
+- **Follow-up: Stop-loss** — Trigger a market sell when price drops below threshold. Stored separately, activated on price change.
+- **Concurrency**: This is CRITICAL here. High-frequency trading → millions of orders/sec. Lock per stock's order book. Or lock-free concurrent queues.
+- **Edge cases**: Cancel partially filled order, order for non-existent stock, market opens/closes (no matching during off-hours)
+- **Portfolio updates**: On each trade, update buyer's and seller's holdings + P&L.
+
 ---
 
 ## 30 · Task Management (Jira-like) 🔴
@@ -1459,6 +1968,16 @@ public class TaskService {
 }
 ```
 
+### 🎯 Interview Tips
+- **State pattern enforces valid transitions**: Each state knows what transitions are allowed. `TodoState.moveForward()` → InProgressState only. Cannot jump to DoneState.
+- **Activity log is an audit trail**: Every change (status, assignee, priority) creates an ActivityLog entry with old/new values.
+- **Dependencies are important**: Task A blocked by Task B → A cannot move to IN_PROGRESS until B is DONE. Check before transition.
+- **Follow-up: Sprint board** — Group tasks by state for a sprint. `Map<state, List<Task>>`. The classic kanban view.
+- **Follow-up: Story points & velocity** — Track points per sprint to predict team velocity.
+- **Follow-up: Custom workflows** — Different task types might have different state machines (Bug: TODO → IN_PROGRESS → TESTING → DONE).
+- **Concurrency**: Two users editing same task simultaneously → last-write-wins or optimistic locking with version number.
+- **Edge cases**: Cyclic dependencies, orphan tasks (project deleted), reassign task during IN_REVIEW, sprint overlap
+
 ---
 
 ## Pattern Cheat Sheet
@@ -1474,6 +1993,107 @@ public class TaskService {
 | **Composite** | Tree structures | File System (File/Directory) |
 | **Mediator** | Centralized communication | Chat application |
 | **Command** | Encapsulate requests | Stock orders, Undo operations |
+
+---
+
+> 📖 **Full Java implementations with Service layers → lld-code.md**
+
+---
+
+# PART 3 · Quick Revision Tables
+
+## Which Pattern for Which Scenario?
+
+| You See This In Requirements... | Use This Pattern |
+|---------------------------------|-----------------|
+| "Only one instance", "global access" | **Singleton** |
+| "Multiple algorithms", "swap behavior", "types of X" | **Strategy** |
+| "Object behavior changes based on state", "state machine" | **State** |
+| "Notify when something changes", "real-time updates" | **Observer** |
+| "Chain of handlers", "pass to next if can't handle" | **Chain of Responsibility** |
+| "Create objects without knowing concrete class" | **Factory** |
+| "Tree structure", "files and folders", "part-whole" | **Composite** |
+| "Centralize communication between objects" | **Mediator** |
+| "Undo/redo", "queue operations", "log commands" | **Command** |
+| "Wrap with extra behavior", "add features dynamically" | **Decorator** |
+
+## Concurrency Cheat Sheet
+
+| Scenario | Solution |
+|----------|----------|
+| Thread-safe map | `ConcurrentHashMap` |
+| Thread-safe singleton | Double-checked locking + `volatile` |
+| Producer-consumer queue | `BlockingQueue` / `PriorityBlockingQueue` |
+| Read-heavy, write-rare | `ReadWriteLock` |
+| Atomic counter | `AtomicInteger` / `AtomicLong` |
+| Timed tasks | `ScheduledExecutorService` |
+| Seat locking / resource hold | `synchronized` block + timer for auto-release |
+| Batch processing | `ExecutorService` with fixed thread pool |
+
+## Data Structure Choices
+
+| Need | Use | Why |
+|------|-----|-----|
+| O(1) lookup by key | `HashMap` | Constant time get/put |
+| O(1) lookup + insertion order | `LinkedHashMap` | Maintains insertion order |
+| Sorted access | `TreeMap` / `TreeSet` | O(log n) sorted operations |
+| Priority-based processing | `PriorityQueue` | O(log n) insert, O(1) peek |
+| Thread-safe priority queue | `PriorityBlockingQueue` | Blocking + priority |
+| O(1) cache eviction | `HashMap` + `DoublyLinkedList` | LRU Cache pattern |
+| FIFO processing | `Queue` / `LinkedList` | Player turns, waitlists |
+| Stack/undo operations | `Deque` / `Stack` | LIFO access |
+
+---
+
+# PART 4 · Top 10 Interview Mistakes in LLD
+
+| # | Mistake | Fix |
+|---|---------|-----|
+| 1 | Jump straight to code | Spend 2-3 min on requirements first |
+| 2 | God class (one class does everything) | Split by Single Responsibility |
+| 3 | Using `if-else` for types/modes | Use Strategy or State pattern |
+| 4 | Public fields everywhere | Use private fields + getters |
+| 5 | Ignoring concurrency | At least MENTION thread safety where relevant |
+| 6 | Not using interfaces | Program to interface, not implementation |
+| 7 | Hardcoding values | Use enums, config objects, constants |
+| 8 | No service layer | Separate business logic from model classes |
+| 9 | Over-engineering simple problems | Tic-Tac-Toe doesn't need 5 patterns |
+| 10 | Not discussing trade-offs | "I chose X because Y. Alternative was Z." |
+
+---
+
+# PART 5 · Problem Similarity Map (If you know X, you can solve Y)
+
+```
+Parking Lot ──→ Hotel Booking (slot management by type + time)
+                └──→ Amazon Locker (slot assignment by size)
+                └──→ Concert Tickets (seat management)
+
+BookMyShow ──→ Concert Tickets (+ dynamic pricing + waitlist)
+             └──→ Hotel Booking (date-range availability)
+
+Vending Machine ──→ ATM Machine (both are state machines with physical I/O)
+                  └──→ Traffic Signal (state cycling)
+
+Food Delivery ──→ Ride Sharing (agent/driver matching + tracking)
+               └──→ Online Shopping Cart (cart + checkout + payment)
+
+Splitwise ──→ can be asked as "simplify debts" algorithm follow-up
+
+Logger ──→ Notification Service (chain of handlers / multi-channel dispatch)
+
+LRU Cache ──→ KV Store (add TTL on top of LRU)
+
+File System ──→ any tree/composite problem
+
+Chat App ──→ Notification Service (message routing + delivery)
+
+Stock Exchange ──→ unique (order book matching engine is specialized)
+
+LinkedIn ──→ most entity-rich; covers: connections, posts, jobs, messaging
+
+Task Management ──→ most state-machine-rich; covers: states, dependencies, sprints
+```
 
 ---
 
