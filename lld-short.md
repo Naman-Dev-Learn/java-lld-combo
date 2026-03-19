@@ -402,15 +402,69 @@ FeeStrategy (interface)
 
 ### Pattern: **Strategy** (fee calculation), **Singleton** (ParkingLot)
 
-### Key Code Sketch
+### All Entity Skeletons (Java)
 ```java
-public class ParkingLot {
+public enum VehicleType { CAR, TRUCK, MOTORCYCLE }
+public enum SpotType { COMPACT, LARGE, HANDICAPPED }
+
+public abstract class Vehicle {
+    private String licensePlate;
+    private VehicleType type;
+    public Vehicle(String licensePlate, VehicleType type) { ... }
+}
+public class Car extends Vehicle { public Car(String plate) { super(plate, VehicleType.CAR); } }
+public class Truck extends Vehicle { public Truck(String plate) { super(plate, VehicleType.TRUCK); } }
+public class Motorcycle extends Vehicle { public Motorcycle(String plate) { super(plate, VehicleType.MOTORCYCLE); } }
+
+public class ParkingSpot {
+    private String spotId;
+    private SpotType type;
+    private boolean isOccupied;
+    private Vehicle vehicle;
+    public boolean canFit(Vehicle v) { ... }
+    public void occupy(Vehicle v) { ... }
+    public void release() { ... }
+}
+
+public class Floor {
+    private int floorNumber;
+    private List<ParkingSpot> spots;
+    public ParkingSpot findAvailableSpot(Vehicle v) { ... }
+    public long getAvailableCount(SpotType type) { ... }
+}
+
+public class Ticket {
+    private String ticketId;
+    private Vehicle vehicle;
+    private ParkingSpot spot;
+    private LocalDateTime entryTime;
+    private LocalDateTime exitTime;
+    public void markExit() { ... }
+    public long getParkedHours() { ... }
+}
+
+public interface FeeStrategy {
+    double calculateFee(Ticket ticket);
+}
+public class HourlyFeeStrategy implements FeeStrategy { ... }
+public class FlatFeeStrategy implements FeeStrategy { ... }
+
+public class ParkingLot {                    // Singleton
     private static ParkingLot instance;
     private List<Floor> floors;
     private FeeStrategy feeStrategy;
-
+    private Map<String, Ticket> activeTickets;
+    public static synchronized ParkingLot getInstance() { ... }
     public Ticket parkVehicle(Vehicle v) { ... }
-    public double unparkVehicle(Ticket t) { ... }
+    public double unparkVehicle(String ticketId) { ... }
+    public void displayAvailability() { ... }
+}
+
+public class ParkingService {                // Service Layer
+    private final ParkingLot parkingLot;
+    public Ticket entry(Vehicle vehicle) { ... }
+    public double exit(String ticketId) { ... }
+    public void showAvailability() { ... }
 }
 ```
 
@@ -484,19 +538,49 @@ LogMessage
 
 ### Pattern: **Singleton** (Logger), **Chain of Responsibility** (handlers)
 
-### Key Code Sketch
+### All Entity Skeletons (Java)
 ```java
-public abstract class LogHandler {
+public enum LogLevel { DEBUG, INFO, WARN, ERROR, FATAL }
+
+public class LogMessage {
+    private LogLevel level;
+    private String message;
+    private LocalDateTime timestamp;
+    public LogMessage(LogLevel level, String message) { ... }
+}
+
+public abstract class LogHandler {           // Chain of Responsibility
     protected LogHandler nextHandler;
     protected LogLevel level;
-
-    public void log(LogMessage msg) {
-        if (msg.getLevel().ordinal() >= level.ordinal()) {
-            write(msg);
-        }
-        if (nextHandler != null) nextHandler.log(msg);
+    public LogHandler setNext(LogHandler next) { ... }
+    public void handle(LogMessage msg) {
+        if (msg.getLevel().ordinal() >= level.ordinal()) write(msg);
+        if (nextHandler != null) nextHandler.handle(msg);
     }
     protected abstract void write(LogMessage msg);
+}
+public class ConsoleHandler extends LogHandler { ... }
+public class FileHandler extends LogHandler {
+    private String filePath;
+    ...
+}
+
+public class Logger {                        // Singleton
+    private static volatile Logger instance;
+    private LogHandler handlerChain;
+    private Logger() {}
+    public static Logger getInstance() { ... }
+    public void setHandlerChain(LogHandler chain) { ... }
+    public void log(LogLevel level, String message) { ... }
+    public void debug(String msg) { ... }
+    public void info(String msg) { ... }
+    public void error(String msg) { ... }
+}
+
+public class LoggingService {                // Service Layer
+    private final Logger logger;
+    public void logInfo(String msg) { ... }
+    public void logError(String msg) { ... }
 }
 ```
 
@@ -565,13 +649,52 @@ Product
 
 ### Pattern: **State**
 
-### Key Code Sketch
+### All Entity Skeletons (Java)
 ```java
-public interface State {
+public class Product {
+    private String code;
+    private String name;
+    private double price;
+    public Product(String code, String name, double price) { ... }
+}
+
+public class Inventory {
+    private Map<String, Product> products;    // code -> product
+    private Map<String, Integer> quantities;  // code -> qty
+    public void addProduct(Product p, int qty) { ... }
+    public Product getProduct(String code) { ... }
+    public boolean isAvailable(String code) { ... }
+    public void reduceQuantity(String code) { ... }
+}
+
+public interface VendingState {               // State Pattern
     void insertMoney(VendingMachine vm, double amount);
     void selectProduct(VendingMachine vm, String code);
     void dispense(VendingMachine vm);
     void returnChange(VendingMachine vm);
+}
+public class IdleState implements VendingState { ... }
+public class HasMoneyState implements VendingState { ... }
+public class DispensingState implements VendingState { ... }
+public class ReturnChangeState implements VendingState { ... }
+
+public class VendingMachine {
+    private VendingState currentState;
+    private Inventory inventory;
+    private double currentBalance;
+    private Product selectedProduct;
+    public void insertMoney(double amount) { currentState.insertMoney(this, amount); }
+    public void selectProduct(String code) { currentState.selectProduct(this, code); }
+    public void dispense() { currentState.dispense(this); }
+    public void returnChange() { currentState.returnChange(this); }
+    // getters + setters for state, balance, selectedProduct
+}
+
+public class VendingMachineService {          // Service Layer
+    private final VendingMachine machine;
+    public void purchaseProduct(double money, String productCode) { ... }
+    public void cancelAndRefund() { ... }
+    public void refillProduct(Product p, int qty) { ... }
 }
 ```
 
@@ -641,14 +764,73 @@ Vote
 
 ### Pattern: **Observer** (notify user when answer posted)
 
-### Key Code Sketch
+### All Entity Skeletons (Java)
 ```java
-public class Question {
-    private List<Observer> observers; // watchers
-    public void addAnswer(Answer a) {
-        answers.add(a);
-        notifyObservers(a);
-    }
+public enum VoteType { UP, DOWN }
+
+public interface QuestionObserver {
+    void onNewAnswer(Question question, Answer answer);
+}
+
+public class User implements QuestionObserver {
+    private String id;
+    private String name;
+    private String email;
+    private int reputation;
+    public void addReputation(int points) { ... }
+    public void onNewAnswer(Question q, Answer a) { ... }
+}
+
+public class Vote {
+    private VoteType type;
+    private User user;
+}
+
+public interface Votable {
+    void addVote(Vote vote);
+    int getVoteCount();
+}
+
+public class Comment {
+    private String id;
+    private String body;
+    private User author;
+    private LocalDateTime timestamp;
+}
+
+public class Answer implements Votable {
+    private String id;
+    private String body;
+    private User author;
+    private List<Vote> votes;
+    private boolean isAccepted;
+    private List<Comment> comments;
+    public void accept() { ... }
+    public void addComment(Comment c) { ... }
+}
+
+public class Question implements Votable {
+    private String id;
+    private String title;
+    private String body;
+    private User author;
+    private List<String> tags;
+    private List<Answer> answers;
+    private List<Vote> votes;
+    private List<Comment> comments;
+    private List<QuestionObserver> observers;
+    public void subscribe(QuestionObserver o) { ... }
+    public void addAnswer(Answer a) { answers.add(a); notifyObservers(a); }
+    public void acceptAnswer(String answerId) { ... }
+}
+
+public class QnAService {                     // Service Layer
+    private Map<String, Question> questions;
+    private Map<String, User> users;
+    public Question postQuestion(String userId, String title, String body, List<String> tags) { ... }
+    public Answer postAnswer(String userId, String questionId, String body) { ... }
+    public void upvoteAnswer(String qId, String aId, String userId) { ... }
+    public List<Question> searchByTag(String tag) { ... }
 }
 ```
 
@@ -727,12 +909,68 @@ Reservation
 
 ### Pattern: None specific (clean OOP)
 
-### Key Code Sketch
+### All Entity Skeletons (Java)
 ```java
-public class LibraryService {
-    public Loan borrowBook(Member m, String barcode) { ... }
-    public Fine returnBook(Loan loan) { ... }
-    public Reservation reserveBook(Member m, String isbn) { ... }
+public enum ReservationStatus { WAITING, FULFILLED, CANCELLED }
+
+public class Book {
+    private String isbn;
+    private String title;
+    private String author;
+    private String subject;
+}
+
+public class BookItem {                      // physical copy
+    private String barcode;
+    private Book book;
+    private boolean isAvailable;
+    private LocalDate dueDate;
+    public void checkout(LocalDate due) { ... }
+    public void returnItem() { ... }
+}
+
+public class Member {
+    private String memberId;
+    private String name;
+    private List<Loan> activeLoans;
+    private List<Reservation> reservations;
+    private static final int MAX_BOOKS = 5;
+    public boolean canBorrow() { return activeLoans.size() < MAX_BOOKS; }
+}
+
+public class Loan {
+    private String loanId;
+    private BookItem bookItem;
+    private Member member;
+    private LocalDate issueDate;
+    private LocalDate dueDate;
+    private LocalDate returnDate;
+    public void markReturned() { ... }
+    public long getOverdueDays() { ... }
+}
+
+public class Reservation {
+    private String id;
+    private Book book;
+    private Member member;
+    private ReservationStatus status;
+    public void fulfill() { ... }
+    public void cancel() { ... }
+}
+
+public class Fine {
+    private Member member;
+    private Loan loan;
+    private double amount;
+}
+
+public class LibraryService {                // Service Layer
+    private Map<String, List<BookItem>> bookItems; // isbn -> copies
+    private Map<String, Member> members;
+    private Queue<Reservation> reservationQueue;
+    public Loan borrowBook(String memberId, String isbn) { ... }
+    public Fine returnBook(String loanId) { ... }
+    public List<Book> searchByTitle(String keyword) { ... }
 }
 ```
 
@@ -806,13 +1044,44 @@ Player
 
 ### Pattern: None specific (clean OOP)
 
-### Key Code Sketch
+### All Entity Skeletons (Java)
 ```java
+public enum Piece { X, O }
+public enum GameStatus { IN_PROGRESS, WIN, DRAW }
+
+public class Player {
+    private String name;
+    private Piece piece;
+    public Player(String name, Piece piece) { ... }
+}
+
 public class Board {
-    private Cell[][] grid;
+    private Piece[][] grid;
+    private int size;
+    private int filledCells;
+    public Board(int size) { ... }
     public boolean placePiece(int row, int col, Piece p) { ... }
-    public boolean checkWin(Piece p) { ... }
+    public boolean checkWin(int row, int col, Piece p) { ... }  // only check row/col/diag of last move
     public boolean isFull() { ... }
+    public void display() { ... }
+}
+
+public class Game {
+    private Board board;
+    private Player[] players;
+    private int currentTurnIndex;
+    private GameStatus status;
+    private Player winner;
+    public Game(Player p1, Player p2, int boardSize) { ... }
+    public boolean makeMove(int row, int col) { ... }
+}
+
+public class TicTacToeService {               // Service Layer
+    private Game game;
+    public void startGame(String p1Name, String p2Name) { ... }
+    public boolean playTurn(int row, int col) { ... }
+    public boolean isGameOver() { ... }
+    public String getResult() { ... }
 }
 ```
 
@@ -874,12 +1143,41 @@ SignalController
 
 ### Pattern: **State**
 
-### Key Code Sketch
+### All Entity Skeletons (Java)
 ```java
 public interface SignalState {
     SignalState next();
     int getDurationSeconds();
     String getColor();
+}
+public class GreenState implements SignalState { ... }
+public class YellowState implements SignalState { ... }
+public class RedState implements SignalState { ... }
+
+public class Road {
+    private String name;
+    public Road(String name) { ... }
+}
+
+public class TrafficSignal {
+    private Road road;
+    private SignalState currentState;
+    public TrafficSignal(Road road, SignalState initialState) { ... }
+    public void transition() { currentState = currentState.next(); }
+    public void forceState(SignalState state) { ... }  // emergency
+}
+
+public class Intersection {
+    private String name;
+    private List<TrafficSignal> signals;
+    public void addSignal(TrafficSignal signal) { ... }
+}
+
+public class TrafficSignalService {           // Service Layer
+    private Intersection intersection;
+    public void startCycle() { ... }
+    public void emergencyOverride(String roadName) { ... }
+    public void displayStatus() { ... }
 }
 ```
 
@@ -950,18 +1248,59 @@ ElevatorState
 
 ### Pattern: **Strategy** (scheduling), **State** (elevator), **Observer** (floor display)
 
-### Key Code Sketch
+### All Entity Skeletons (Java)
 ```java
-public interface Scheduler {
-    Elevator assignElevator(List<Elevator> elevators, Request req);
+public enum Direction { UP, DOWN, IDLE }
+public enum ElevatorStatus { MOVING, IDLE, DOOR_OPEN }
+
+public class Request {
+    private int sourceFloor;
+    private int destinationFloor;
+    private Direction direction;
 }
 
-public class NearestElevatorScheduler implements Scheduler {
+public interface ElevatorObserver {
+    void onFloorChange(int elevatorId, int floor, Direction direction);
+}
+public class FloorDisplay implements ElevatorObserver { ... }
+
+public class Elevator {
+    private int id;
+    private int currentFloor;
+    private Direction direction;
+    private ElevatorStatus status;
+    private TreeSet<Integer> upStops;
+    private TreeSet<Integer> downStops;       // reverse order
+    private List<ElevatorObserver> observers;
+    public void addRequest(int floor) { ... }
+    public void move() { ... }                // pops next stop, changes floor
+    public boolean hasStops() { ... }
+    public void addObserver(ElevatorObserver o) { ... }
+}
+
+public interface ElevatorScheduler {          // Strategy
+    Elevator assignElevator(List<Elevator> elevators, Request request);
+}
+public class NearestElevatorScheduler implements ElevatorScheduler {
     public Elevator assignElevator(List<Elevator> elevators, Request req) {
         return elevators.stream()
             .min(Comparator.comparingInt(e -> Math.abs(e.getCurrentFloor() - req.getSourceFloor())))
             .orElseThrow();
     }
+}
+
+public class Building {
+    private List<Elevator> elevators;
+    private ElevatorScheduler scheduler;
+    private int totalFloors;
+    public Building(int floors, int numElevators, ElevatorScheduler scheduler) { ... }
+}
+
+public class ElevatorService {                // Service Layer
+    private final Building building;
+    public void requestElevator(int sourceFloor, int destFloor) { ... }
+    public void step() { ... }                // move all elevators one stop
+    public void displayStatus() { ... }
 }
 ```
 
@@ -1030,14 +1369,38 @@ ExpiryManager
 
 ### Pattern: **Singleton**
 
-### Key Code Sketch
+### All Entity Skeletons (Java)
 ```java
-public class KVStore {
-    private final ConcurrentHashMap<String, Entry> store = new ConcurrentHashMap<>();
+public class Entry {
+    private String key;
+    private String value;
+    private long createdAt;       // epoch ms
+    private long ttlMs;           // 0 = no expiry
+    public boolean isExpired() { ... }
+}
 
+public class KVStore {                        // Singleton
+    private static volatile KVStore instance;
+    private final ConcurrentHashMap<String, Entry> store;
+    private final ScheduledExecutorService expiryService;
+    private KVStore() { ... }                 // starts eviction thread
+    public static KVStore getInstance() { ... }
+    public void put(String key, String value) { ... }
     public void put(String key, String value, long ttlMs) { ... }
+    public String get(String key) { ... }     // lazy expiry check
+    public boolean delete(String key) { ... }
+    public boolean exists(String key) { ... }
+    public Map<String, String> snapshot() { ... }
+    public int size() { ... }
+}
+
+public class KVStoreService {                 // Service Layer
+    private final KVStore store;
+    public void set(String key, String value) { ... }
+    public void setWithTTL(String key, String value, long ttlMs) { ... }
     public String get(String key) { ... }
-    public void delete(String key) { ... }
+    public boolean delete(String key) { ... }
+    public Map<String, String> takeSnapshot() { ... }
 }
 ```
 
@@ -1104,27 +1467,41 @@ DoublyLinkedList<K,V>
 
 ### Pattern: None (data structure problem)
 
-### Key Code Sketch
+### All Entity Skeletons (Java)
 ```java
+public class Node<K, V> {
+    K key;
+    V value;
+    Node<K, V> prev;
+    Node<K, V> next;
+    public Node(K key, V value) { ... }
+}
+
+public class DoublyLinkedList<K, V> {
+    private Node<K, V> head;      // dummy
+    private Node<K, V> tail;      // dummy
+    public void addToFront(Node<K, V> node) { ... }
+    public void remove(Node<K, V> node) { ... }
+    public Node<K, V> removeLast() { ... }
+    public void moveToFront(Node<K, V> node) { ... }
+}
+
 public class LRUCache<K, V> {
     private final int capacity;
-    private final Map<K, Node<K,V>> map;
-    private final DoublyLinkedList<K,V> dll;
+    private final Map<K, Node<K, V>> map;
+    private final DoublyLinkedList<K, V> dll;
+    public LRUCache(int capacity) { ... }
+    public V get(K key) { ... }               // miss: null | hit: moveToFront + return
+    public void put(K key, V value) { ... }   // exists: update+moveFront | new: evict if full, addFront
+    public void remove(K key) { ... }
+    public int size() { ... }
+}
 
-    public V get(K key) {
-        Node<K,V> node = map.get(key);
-        if (node == null) return null;
-        dll.moveToFront(node);
-        return node.value;
-    }
-
-    public void put(K key, V value) {
-        if (map.containsKey(key)) { /* update + move front */ }
-        else {
-            if (map.size() == capacity) { /* evict last */ }
-            /* add new node to front */
-        }
-    }
+public class CacheService {                   // Service Layer
+    private final LRUCache<String, Object> cache;
+    public void cacheResult(String key, Object value) { ... }
+    public Object getCached(String key) { ... }
+    public void invalidate(String key) { ... }
 }
 ```
 
@@ -1191,18 +1568,73 @@ Payment - id, amount, method, status
 
 ### Pattern: **Strategy** (payment), **Observer** (notification)
 
-### Key Code Sketch
+### All Entity Skeletons (Java)
 ```java
-public class BookingService {
-    public Booking initiateBooking(User u, Show s, List<Seat> seats) {
-        lockSeats(seats); // 5 min lock
-        return new Booking(u, s, seats, BookingStatus.PENDING);
-    }
-    public void confirmBooking(Booking b, PaymentStrategy ps) {
-        ps.pay(b.getTotalAmount());
-        b.setStatus(BookingStatus.CONFIRMED);
-        notifyUser(b);
-    }
+public enum SeatType { REGULAR, PREMIUM, VIP }
+public enum SeatStatus { AVAILABLE, LOCKED, BOOKED }
+public enum BookingStatus { PENDING, CONFIRMED, CANCELLED }
+
+public class Movie {
+    private String id, title, genre;
+    private int durationMinutes;
+}
+
+public class Seat {
+    private String id;
+    private SeatType type;
+    private String row;
+    private int number;
+    private double price;
+}
+
+public class Screen {
+    private String id;
+    private List<Seat> seats;
+}
+
+public class Show {
+    private String id;
+    private Movie movie;
+    private Screen screen;
+    private LocalDateTime startTime;
+    private Map<String, SeatStatus> seatStatusMap;  // seatId -> status
+    public synchronized boolean lockSeats(List<Seat> seats) { ... }
+    public void bookSeats(List<Seat> seats) { ... }
+    public void releaseSeats(List<Seat> seats) { ... }
+    public List<Seat> getAvailableSeats() { ... }
+}
+
+public class Theatre {
+    private String id, name, city;
+    private List<Screen> screens;
+    private List<Show> shows;
+    public List<Show> getShowsForMovie(String movieId) { ... }
+}
+
+public class User {
+    private String id, name, email;
+}
+
+public interface PaymentStrategy { boolean pay(double amount); }
+public class CardPayment implements PaymentStrategy { ... }
+public class UPIPayment implements PaymentStrategy { ... }
+
+public class Booking {
+    private String id;
+    private User user;
+    private Show show;
+    private List<Seat> seats;
+    private BookingStatus status;
+    private double totalAmount;
+    public void confirm() { ... }
+    public void cancel() { ... }
+}
+
+public class BookingService {                 // Service Layer
+    public Booking initiateBooking(User u, Show s, List<Seat> seats) { ... }  // locks seats
+    public void confirmBooking(String bookingId, PaymentStrategy ps) { ... }
+    public void cancelBooking(String bookingId) { ... }
+    public List<Show> searchShows(String city, String movieId) { ... }
 }
 ```
 
@@ -1278,20 +1710,68 @@ Game
 
 ### Pattern: **Strategy/Polymorphism** (each piece's move logic), **Factory** (create pieces)
 
-### Key Code Sketch
+### All Entity Skeletons (Java)
 ```java
+public enum Color { WHITE, BLACK }
+public enum ChessGameStatus { ACTIVE, CHECK, CHECKMATE, STALEMATE, RESIGNED }
+
+public class Cell {
+    private int x, y;
+    private Piece piece;
+    public boolean isEmpty() { return piece == null; }
+}
+
 public abstract class Piece {
     protected Color color;
     protected boolean killed;
     public abstract boolean canMove(Board board, Cell from, Cell to);
+    public abstract String getSymbol();
 }
-
+public class King extends Piece { ... }   // dx<=1, dy<=1
+public class Queen extends Piece { ... }  // straight or diagonal + pathClear
+public class Rook extends Piece { ... }   // straight only + pathClear
+public class Bishop extends Piece { ... } // diagonal only + pathClear
 public class Knight extends Piece {
     public boolean canMove(Board board, Cell from, Cell to) {
         int dx = Math.abs(from.getX() - to.getX());
         int dy = Math.abs(from.getY() - to.getY());
         return (dx == 2 && dy == 1) || (dx == 1 && dy == 2);
     }
+}
+public class Pawn extends Piece { ... }   // forward 1 (or 2 from start), capture diagonal
+
+public class Board {
+    private Cell[][] grid;                // 8x8
+    public void setupStandardGame() { ... }
+    public Cell getCell(int x, int y) { ... }
+    public boolean isPathClear(Cell from, Cell to) { ... }
+}
+
+public class Move {
+    private Player player;
+    private Piece piece;
+    private Cell from, to;
+    private Piece killedPiece;
+}
+
+public class Player {
+    private String name;
+    private Color color;
+}
+
+public class ChessGame {
+    private Board board;
+    private Player[] players;
+    private int currentTurn;
+    private List<Move> moveHistory;
+    private ChessGameStatus status;
+    public boolean makeMove(int fromX, int fromY, int toX, int toY) { ... }
+}
+
+public class ChessGameService {               // Service Layer
+    private ChessGame game;
+    public void startGame(String whiteName, String blackName) { ... }
+    public boolean playMove(int fromX, int fromY, int toX, int toY) { ... }
 }
 ```
 
@@ -1357,20 +1837,49 @@ Game
 
 ### Pattern: None specific (clean OOP)
 
-### Key Code Sketch
+### All Entity Skeletons (Java)
 ```java
-public class Game {
+public class Dice {
+    private int numberOfDice;
+    private int faceCount;
+    public int roll() { ... }             // sum of all dice
+}
+
+public class Player {
+    private String name;
+    private int position;
+}
+
+public class Board {
+    private int size;                      // total cells
+    private Map<Integer, Integer> snakes;  // head -> tail
+    private Map<Integer, Integer> ladders; // bottom -> top
+    public void addSnake(int head, int tail) { ... }
+    public void addLadder(int bottom, int top) { ... }
+    public int getFinalPosition(int position) { ... }  // checks both maps
+}
+
+public class SnakeLadderGame {
+    private Board board;
+    private Queue<Player> players;
+    private Dice dice;
+    private Player winner;
     public void play() {
         while (winner == null) {
             Player p = players.poll();
             int rolled = dice.roll();
             int newPos = p.getPosition() + rolled;
-            newPos = board.getfinalPosition(newPos); // check snake/ladder
+            if (newPos > board.getSize()) { players.offer(p); continue; }
+            newPos = board.getFinalPosition(newPos);
             p.setPosition(newPos);
-            if (newPos >= board.getSize()) { winner = p; }
-            else { players.offer(p); }
+            if (newPos == board.getSize()) winner = p;
+            else players.offer(p);
         }
     }
+}
+
+public class SnakeLadderService {             // Service Layer
+    public void startGame() { ... }           // creates board, players, dice; calls game.play()
 }
 ```
 
@@ -1440,18 +1949,70 @@ Transaction
 
 ### Pattern: **State** (ATM flow), **Chain of Responsibility** (cash dispensing)
 
-### Key Code Sketch
+### All Entity Skeletons (Java)
 ```java
-public abstract class CashHandler {
+public enum TransactionType { WITHDRAW, DEPOSIT, BALANCE }
+
+public class Account {
+    private String accountNumber;
+    private double balance;
+    private String pin;
+    public boolean validatePin(String pin) { ... }
+    public void withdraw(double amount) { ... }
+    public void deposit(double amount) { ... }
+}
+
+public class Card {
+    private String cardNumber;
+    private String accountNumber;
+}
+
+public abstract class CashHandler {           // Chain of Responsibility
     protected CashHandler next;
     protected int denomination;
+    protected int count;                      // available notes
+    public CashHandler setNext(CashHandler next) { ... }
+    public void dispense(int amount) { ... }  // dispense what you can, forward remainder
+    public int getTotalCash() { ... }
+}
+public class FiveHundredHandler extends CashHandler { ... }
+public class TwoHundredHandler extends CashHandler { ... }
+public class HundredHandler extends CashHandler { ... }
 
-    public void dispense(int amount) {
-        int count = amount / denomination;
-        int remainder = amount % denomination;
-        if (count > 0) System.out.println(count + " x ₹" + denomination);
-        if (remainder > 0 && next != null) next.dispense(remainder);
-    }
+public interface ATMState {                   // State Pattern
+    void insertCard(ATM atm, Card card);
+    void enterPin(ATM atm, String pin);
+    void withdraw(ATM atm, int amount);
+    void deposit(ATM atm, double amount);
+    void checkBalance(ATM atm);
+    void ejectCard(ATM atm);
+}
+public class IdleState implements ATMState { ... }
+public class CardInsertedState implements ATMState { ... }
+public class AuthenticatedState implements ATMState { ... }
+
+public class BankService {
+    private Map<String, Account> accounts;
+    public void addAccount(Account acc) { ... }
+    public Account getAccount(String accountNumber) { ... }
+}
+
+public class ATM {
+    private ATMState currentState;
+    private CashHandler cashDispenser;
+    private BankService bankService;
+    private Card currentCard;
+    private Account currentAccount;
+    public void insertCard(Card card) { currentState.insertCard(this, card); }
+    public void enterPin(String pin) { currentState.enterPin(this, pin); }
+    public void withdraw(int amount) { currentState.withdraw(this, amount); }
+    public void ejectCard() { currentState.ejectCard(this); }
+}
+
+public class ATMService {                     // Service Layer
+    private final ATM atm;
+    public void performWithdrawal(Card card, String pin, int amount) { ... }
+    public void checkBalance(Card card, String pin) { ... }
 }
 ```
 
@@ -1526,17 +2087,64 @@ Coupon
 
 ### Pattern: **Strategy** (payment), **Observer** (order status notifications)
 
-### Key Code Sketch
+### All Entity Skeletons (Java)
 ```java
-public class CheckoutService {
-    public Order checkout(Cart cart, PaymentStrategy ps, String couponCode) {
-        double total = cart.getTotal();
-        if (couponCode != null) total = applyCoupon(total, couponCode);
-        ps.pay(total);
-        Order order = new Order(cart, total, OrderStatus.CONFIRMED);
-        notifyUser(order);
-        return order;
-    }
+public enum OrderStatus { PLACED, CONFIRMED, SHIPPED, DELIVERED, CANCELLED }
+
+public class Product {
+    private String id, name, category;
+    private double price;
+}
+
+public class CartItem {
+    private Product product;
+    private int quantity;
+    public double getSubtotal() { return product.getPrice() * quantity; }
+}
+
+public class Cart {
+    private String userId;
+    private Map<String, CartItem> items;      // productId -> item
+    public void addItem(Product product, int qty) { ... }
+    public void removeItem(String productId) { ... }
+    public void updateQuantity(String productId, int qty) { ... }
+    public double getTotal() { ... }
+    public void clear() { ... }
+}
+
+public class Coupon {
+    private String code;
+    private double discountPercent;
+    private LocalDate validUntil;
+    public boolean isValid() { ... }
+    public double apply(double amount) { ... }
+}
+
+public interface PaymentStrategy { boolean pay(double amount); }
+public class WalletPayment implements PaymentStrategy { ... }
+
+public interface OrderObserver {
+    void onStatusChange(Order order, OrderStatus newStatus);
+}
+
+public class Order {
+    private String id;
+    private String userId;
+    private List<CartItem> items;
+    private double totalAmount;
+    private OrderStatus status;
+    private List<OrderObserver> observers;
+    public void setStatus(OrderStatus status) { ... }  // notifies observers
+}
+
+public class ShoppingService {                // Service Layer
+    private Map<String, Cart> carts;
+    private Map<String, Order> orders;
+    private Map<String, Coupon> coupons;
+    private Map<String, Product> catalog;
+    public void addToCart(String userId, String productId, int qty) { ... }
+    public Order checkout(String userId, PaymentStrategy ps, String couponCode) { ... }
+    public void updateOrderStatus(String orderId, OrderStatus status) { ... }
 }
 ```
 
@@ -1603,19 +2211,64 @@ AgentAssignmentStrategy (interface)
 
 ### Pattern: **Strategy** (agent assignment), **Observer** (order tracking)
 
-### Key Code Sketch
+### All Entity Skeletons (Java)
 ```java
-public class OrderService {
-    private AgentAssignmentStrategy agentStrategy;
+public enum FoodOrderStatus { PLACED, PREPARING, PICKED_UP, DELIVERED, CANCELLED }
 
-    public Order placeOrder(User u, Cart c, PaymentStrategy ps) {
-        ps.pay(c.getTotal());
-        Order order = new Order(u, c);
-        DeliveryAgent agent = agentStrategy.assign(order);
-        order.setAgent(agent);
-        order.setStatus(OrderStatus.PLACED);
-        return order;
-    }
+public class Location {
+    private double lat, lng;
+    public double distanceTo(Location other) { ... }
+}
+
+public class MenuItem {
+    private String id, name;
+    private double price;
+    private boolean isAvailable;
+}
+
+public class Restaurant {
+    private String id, name;
+    private Location location;
+    private List<MenuItem> menu;
+    private boolean isOpen;
+    public void addMenuItem(MenuItem item) { ... }
+}
+
+public class DeliveryAgent {
+    private String id, name;
+    private Location location;
+    private boolean isAvailable;
+    private double rating;
+    public void assignOrder() { isAvailable = false; }
+    public void completeDelivery() { isAvailable = true; }
+    public void updateRating(double r) { ... }
+}
+
+public interface AgentAssignmentStrategy {    // Strategy
+    DeliveryAgent assign(List<DeliveryAgent> agents, Location restaurantLocation);
+}
+public class NearestAgentStrategy implements AgentAssignmentStrategy { ... }
+
+public class FoodOrder {
+    private String id;
+    private User user;
+    private Restaurant restaurant;
+    private List<MenuItem> items;
+    private DeliveryAgent agent;
+    private FoodOrderStatus status;
+    private double totalAmount;
+    public void updateStatus(FoodOrderStatus newStatus) { ... }
+    public void setAgent(DeliveryAgent agent) { ... }
+}
+
+public class FoodDeliveryService {            // Service Layer
+    private AgentAssignmentStrategy agentStrategy;
+    public void registerRestaurant(Restaurant r) { ... }
+    public void registerAgent(DeliveryAgent a) { ... }
+    public List<Restaurant> searchByLocation(Location userLoc, double maxDist) { ... }
+    public FoodOrder placeOrder(User user, String restaurantId, List<String> itemIds, PaymentStrategy ps) { ... }
+    public void updateOrderStatus(String orderId, FoodOrderStatus status) { ... }
+    public void rateAgent(String orderId, double rating) { ... }
 }
 ```
 
@@ -1683,18 +2336,53 @@ Guest - id, name, email, phone
 
 ### Pattern: **Strategy** (pricing — peak/off-peak), **Observer** (booking confirmation)
 
-### Key Code Sketch
+### All Entity Skeletons (Java)
 ```java
-public class BookingService {
-    public Booking bookRoom(Guest g, Room r, LocalDate in, LocalDate out, PaymentStrategy ps) {
-        if (!r.isAvailable(in, out)) throw new RoomNotAvailableException();
-        double total = pricingStrategy.calculate(r, in, out);
-        ps.pay(total);
-        Booking b = new Booking(g, r, in, out);
-        r.addBooking(b);
-        notifyGuest(b);
-        return b;
-    }
+public enum RoomType { SINGLE, DOUBLE, SUITE }
+public enum HotelBookingStatus { CONFIRMED, CANCELLED, CHECKED_IN, CHECKED_OUT }
+
+public class Guest {
+    private String id, name, email;
+}
+
+public class Room {
+    private String id;
+    private RoomType type;
+    private double pricePerNight;
+    private List<HotelBooking> bookings;
+    public boolean isAvailable(LocalDate checkIn, LocalDate checkOut) { ... }  // overlap check
+    public void addBooking(HotelBooking b) { ... }
+}
+
+public class Hotel {
+    private String id, name, city;
+    private List<Room> rooms;
+    public void addRoom(Room room) { ... }
+    public List<Room> searchAvailableRooms(RoomType type, LocalDate in, LocalDate out) { ... }
+}
+
+public interface PricingStrategy {            // Strategy
+    double calculate(Room room, LocalDate checkIn, LocalDate checkOut);
+}
+public class StandardPricing implements PricingStrategy { ... }
+public class PeakSeasonPricing implements PricingStrategy { ... }
+
+public class HotelBooking {
+    private String id;
+    private Guest guest;
+    private Room room;
+    private LocalDate checkIn, checkOut;
+    private HotelBookingStatus status;
+    private double totalAmount;
+    public void cancel() { status = HotelBookingStatus.CANCELLED; }
+}
+
+public class HotelBookingService {            // Service Layer
+    private PricingStrategy pricingStrategy;
+    public void registerHotel(Hotel hotel) { ... }
+    public List<Room> searchRooms(String city, RoomType type, LocalDate in, LocalDate out) { ... }
+    public HotelBooking bookRoom(Guest guest, Room room, LocalDate in, LocalDate out, PaymentStrategy ps) { ... }
+    public double cancelBooking(String bookingId) { ... }  // returns refund amount
 }
 ```
 
@@ -1767,20 +2455,57 @@ FileSystem
 
 ### Pattern: **Composite**
 
-### Key Code Sketch
+### All Entity Skeletons (Java)
 ```java
-public abstract class Entry {
+public abstract class Entry {                // Composite
     protected String name;
     protected Directory parent;
+    protected LocalDateTime createdAt;
     public abstract int getSize();
+    public abstract String getType();
+    public String getFullPath() { ... }       // walks parent chain to root
+}
+
+public class File extends Entry {
+    private StringBuilder content;
+    public String read() { ... }
+    public void write(String data) { ... }
+    public void append(String data) { ... }
+    public int getSize() { return content.length(); }
 }
 
 public class Directory extends Entry {
-    private Map<String, Entry> children = new HashMap<>();
-    public int getSize() {
-        return children.values().stream().mapToInt(Entry::getSize).sum();
-    }
+    private Map<String, Entry> children;      // name -> entry
     public void addEntry(Entry e) { children.put(e.getName(), e); e.parent = this; }
+    public Entry getEntry(String name) { ... }
+    public boolean removeEntry(String name) { ... }
+    public List<Entry> listEntries() { ... }
+    public int getSize() { return children.values().stream().mapToInt(Entry::getSize).sum(); }
+}
+
+public class FileSystem {
+    private Directory root;
+    private Directory currentDir;
+    public void mkdir(String name) { ... }
+    public void touch(String name) { ... }
+    public void cd(String path) { ... }       // .., /, or dirname
+    public List<String> ls() { ... }
+    public String pwd() { ... }
+    public void writeFile(String name, String content) { ... }
+    public String readFile(String name) { ... }
+    public boolean rm(String name) { ... }    // recursive for dirs
+    public List<String> find(String fileName) { ... }
+}
+
+public class FileSystemService {              // Service Layer
+    private final FileSystem fs;
+    public void createDirectory(String name) { ... }
+    public void createFile(String name, String content) { ... }
+    public void navigate(String path) { ... }
+    public void listContents() { ... }
+    public String readFile(String name) { ... }
+    public void delete(String name) { ... }
+    public List<String> search(String fileName) { ... }
 }
 ```
 
@@ -1858,18 +2583,51 @@ Observable (users subscribe to topics)
 
 ### Pattern: **Observer**, **Strategy**, **Factory**
 
-### Key Code Sketch
+### All Entity Skeletons (Java)
 ```java
-public class NotificationService {
-    private ChannelFactory factory;
+public enum ChannelType { EMAIL, SMS, PUSH }
+public enum Priority { LOW, MEDIUM, HIGH, CRITICAL }
+public enum NotificationStatus { PENDING, SENT, FAILED, RETRYING }
 
-    public void notify(String userId, String templateId, ChannelType type, Priority p) {
-        Channel ch = factory.createChannel(type);
-        Notification n = buildFromTemplate(templateId, userId);
-        n.setPriority(p);
-        boolean sent = ch.send(n);
-        if (!sent) retryQueue.enqueue(n);
-    }
+public class Template {
+    private String id, name, body;            // body has {placeholders}
+    public String render(Map<String, String> params) { ... }
+}
+
+public class Notification {
+    private String id, userId, message;
+    private ChannelType channelType;
+    private Priority priority;
+    private NotificationStatus status;
+    private int retryCount;
+    public void incrementRetry() { retryCount++; }
+}
+
+public interface NotificationChannel {        // Strategy
+    boolean send(Notification notification);
+}
+public class EmailChannel implements NotificationChannel { ... }
+public class SMSChannel implements NotificationChannel { ... }
+public class PushChannel implements NotificationChannel { ... }
+
+public class ChannelFactory {                 // Factory
+    public NotificationChannel createChannel(ChannelType type) { ... }
+}
+
+public class UserPreference {
+    private String userId;
+    private List<ChannelType> preferredChannels;
+}
+
+public class NotificationService {            // Service Layer
+    private ChannelFactory channelFactory;
+    private Map<String, Template> templates;
+    private Map<String, UserPreference> preferences;
+    private Queue<Notification> retryQueue;
+    public void registerTemplate(Template t) { ... }
+    public void setUserPreference(UserPreference p) { ... }
+    public void send(String userId, String templateId, Map<String, String> params, Priority priority) { ... }
+    public void processRetryQueue() { ... }
 }
 ```
 
@@ -1937,15 +2695,66 @@ Conversation (abstract)
 
 ### Pattern: **Observer** (new message push), **Mediator** (ChatMediator routes messages)
 
-### Key Code Sketch
+### All Entity Skeletons (Java)
 ```java
-public class ChatMediator {
-    public void sendMessage(Message msg, Conversation conv) {
-        conv.addMessage(msg);
-        conv.getParticipants().stream()
-            .filter(u -> !u.equals(msg.getSender()))
-            .forEach(u -> u.receive(msg));
-    }
+public enum UserStatus { ONLINE, OFFLINE }
+public enum MessageType { TEXT, IMAGE, FILE }
+public enum MessageStatus { SENT, DELIVERED, READ }
+
+public class Message {
+    private String id;
+    private ChatUser sender;
+    private String content;
+    private MessageType type;
+    private LocalDateTime timestamp;
+    private MessageStatus status;
+    public void markDelivered() { ... }
+    public void markRead() { ... }
+}
+
+public class ChatUser {
+    private String id, name;
+    private UserStatus status;
+    public void goOnline() { ... }
+    public void goOffline() { ... }
+    public void receive(Message msg) { ... }
+}
+
+public abstract class Conversation {
+    protected String id;
+    protected List<Message> messages;
+    public void addMessage(Message msg) { ... }
+    public abstract List<ChatUser> getParticipants();
+    public List<Message> getMessageHistory() { ... }
+}
+
+public class OneToOneConversation extends Conversation {
+    private ChatUser user1, user2;
+    public List<ChatUser> getParticipants() { return List.of(user1, user2); }
+}
+
+public class GroupConversation extends Conversation {
+    private String groupName;
+    private List<ChatUser> participants;
+    private ChatUser admin;
+    public void addParticipant(ChatUser user) { ... }
+    public void removeParticipant(ChatUser user) { ... }
+}
+
+public class ChatMediator {                   // Mediator
+    private Map<String, Conversation> conversations;
+    public void sendMessage(Message msg, String conversationId) { ... }  // routes to all participants
+}
+
+public class ChatService {                    // Service Layer
+    private ChatMediator mediator;
+    private Map<String, ChatUser> users;
+    public ChatUser registerUser(String id, String name) { ... }
+    public Conversation startOneToOne(String userId1, String userId2) { ... }
+    public GroupConversation createGroup(String groupName, String adminId) { ... }
+    public void addToGroup(String groupId, String userId) { ... }
+    public void sendMessage(String senderId, String convId, String content, MessageType type) { ... }
+    public List<Message> getHistory(String convId) { ... }
 }
 ```
 
@@ -2021,26 +2830,47 @@ ExecutionStrategy (interface)
 
 ### Pattern: **Strategy** (execution type), **Observer** (job completion callback)
 
-### Key Code Sketch
+### All Entity Skeletons (Java)
 ```java
-public class JobScheduler {
+public enum JobStatus { QUEUED, RUNNING, COMPLETED, FAILED }
+
+public class Job implements Comparable<Job> {
+    private String id, name;
+    private Runnable task;
+    private long scheduledTimeMs;             // epoch
+    private int priority;                     // lower = higher priority
+    private JobStatus status;
+    private boolean recurring;
+    private long intervalMs;
+    public Job asRecurring(long intervalMs) { ... }
+    public boolean isReady() { return System.currentTimeMillis() >= scheduledTimeMs; }
+    public Job nextOccurrence() { ... }       // creates next recurring job
+    public int compareTo(Job o) { ... }       // by time, then priority
+}
+
+public interface JobCompletionListener {      // Observer
+    void onCompleted(Job job);
+    void onFailed(Job job, Exception e);
+}
+
+public class JobScheduler {                   // Singleton
+    private static volatile JobScheduler instance;
     private final PriorityBlockingQueue<Job> queue;
-    private final ExecutorService executor;
-
+    private final ExecutorService workerPool;
+    private final List<JobCompletionListener> listeners;
+    private volatile boolean running;
+    public static JobScheduler getInstance(int poolSize) { ... }
+    public void addListener(JobCompletionListener l) { ... }
     public void submit(Job job) { queue.offer(job); }
+    public void start() { ... }               // scheduler thread polls queue
+    public void stop() { ... }
+}
 
-    public void start() {
-        executor.submit(() -> {
-            while (true) {
-                Job job = queue.take();
-                if (job.isReady()) {
-                    job.setStatus(RUNNING);
-                    job.getTask().run();
-                    job.setStatus(COMPLETED);
-                } else { queue.offer(job); }
-            }
-        });
-    }
+public class JobSchedulerService {            // Service Layer
+    private final JobScheduler scheduler;
+    public void scheduleOneTime(String name, Runnable task, long delayMs, int priority) { ... }
+    public void scheduleRecurring(String name, Runnable task, long intervalMs, int priority) { ... }
+    public void shutdown() { ... }
 }
 ```
 
@@ -2113,15 +2943,45 @@ RateLimitConfig
 
 ### Pattern: **Strategy**
 
-### Key Code Sketch
+### All Entity Skeletons (Java)
 ```java
-public class TokenBucketStrategy implements RateLimitStrategy {
-    private final Map<String, TokenBucket> buckets = new ConcurrentHashMap<>();
+public class RateLimitConfig {
+    private int maxRequests;
+    private long windowMs;
+}
 
-    public boolean allowRequest(String clientId) {
-        TokenBucket bucket = buckets.computeIfAbsent(clientId, k -> new TokenBucket(config));
-        return bucket.tryConsume();
-    }
+public interface RateLimitStrategy {
+    boolean allowRequest(String clientId);
+}
+
+public class FixedWindowStrategy implements RateLimitStrategy {
+    private final RateLimitConfig config;
+    private final Map<String, long[]> windows; // clientId -> [windowStart, count]
+    public boolean allowRequest(String clientId) { ... }
+}
+
+public class SlidingWindowLogStrategy implements RateLimitStrategy {
+    private final RateLimitConfig config;
+    private final Map<String, Deque<Long>> logs; // clientId -> timestamps
+    public boolean allowRequest(String clientId) { ... }
+}
+
+public class TokenBucketStrategy implements RateLimitStrategy {
+    private final int maxTokens;
+    private final long refillIntervalMs;
+    private final Map<String, long[]> buckets; // clientId -> [tokens, lastRefillTime]
+    public boolean allowRequest(String clientId) { ... }
+}
+
+public class RateLimiter {
+    private final RateLimitStrategy strategy;
+    public boolean isAllowed(String clientId) { return strategy.allowRequest(clientId); }
+}
+
+public class RateLimiterService {             // Service Layer
+    private final Map<String, RateLimiter> limiters; // apiPath -> limiter
+    public void configureApi(String apiPath, RateLimitStrategy strategy) { ... }
+    public boolean checkRequest(String apiPath, String clientId) { ... }
 }
 ```
 
@@ -2196,15 +3056,53 @@ BalanceSheet
 
 ### Pattern: **Strategy** (split type)
 
-### Key Code Sketch
+### All Entity Skeletons (Java)
 ```java
-public class ExpenseService {
-    public void addExpense(Expense e) {
-        List<Split> splits = e.getSplitStrategy().split(e);
-        for (Split s : splits) {
-            balanceSheet.update(e.getPaidBy(), s.getUser(), s.getAmount());
-        }
-    }
+public enum SplitType { EQUAL, EXACT, PERCENT }
+
+public class SplitwiseUser {
+    private String id, name, email;
+}
+
+public abstract class Split {
+    protected SplitwiseUser user;
+    protected double amount;
+}
+public class EqualSplit extends Split { ... }
+public class ExactSplit extends Split { public ExactSplit(SplitwiseUser user, double amount) { ... } }
+public class PercentSplit extends Split { private double percent; ... }
+
+public class Expense {
+    private String id, description;
+    private double amount;
+    private SplitwiseUser paidBy;
+    private List<Split> splits;
+    private SplitType splitType;
+}
+
+public class SplitwiseGroup {
+    private String id, name;
+    private List<SplitwiseUser> members;
+    private List<Expense> expenses;
+    public void addMember(SplitwiseUser u) { ... }
+    public void addExpense(Expense e) { ... }
+}
+
+public class BalanceSheet {
+    private Map<String, Map<String, Double>> balances; // [owerId][payerId] = amount
+    public void update(SplitwiseUser paidBy, SplitwiseUser owes, double amount) { ... }
+    public void settle(String userId1, String userId2, double amount) { ... }
+    public void printBalances() { ... }
+}
+
+public class SplitwiseService {               // Service Layer
+    private Map<String, SplitwiseUser> users;
+    private Map<String, SplitwiseGroup> groups;
+    private BalanceSheet balanceSheet;
+    public SplitwiseGroup createGroup(String name, List<String> memberIds) { ... }
+    public void addExpense(String groupId, String paidById, double amount, String desc, SplitType type, List<Split> splits) { ... }
+    public void settleUp(String userId1, String userId2, double amount) { ... }
+    public void showBalances() { ... }
 }
 ```
 
@@ -2291,19 +3189,78 @@ RideState (interface)
 
 ### Pattern: **Strategy** (fare, matching), **Observer** (ride updates), **State** (ride lifecycle)
 
-### Key Code Sketch
+### All Entity Skeletons (Java)
 ```java
-public class RideService {
-    private MatchingStrategy matchingStrategy;
-    private FareStrategy fareStrategy;
+public enum RideStatus { REQUESTED, ACCEPTED, IN_PROGRESS, COMPLETED, CANCELLED }
 
-    public Ride requestRide(Rider rider, Location pickup, Location drop) {
-        Driver driver = matchingStrategy.findDriver(rider, pickup);
-        double fare = fareStrategy.calculate(pickup, drop);
-        Ride ride = new Ride(rider, driver, pickup, drop, fare);
-        ride.setState(new RequestedState());
-        return ride;
-    }
+public class Rider {
+    private String id, name;
+    private Location location;
+    private double rating;
+    public void updateRating(double r) { ... }
+}
+
+public class Driver {
+    private String id, name;
+    private Location location;
+    private String vehicleNumber;
+    private boolean isAvailable;
+    private double rating;
+    public void setAvailable(boolean a) { ... }
+    public void updateRating(double r) { ... }
+}
+
+public interface FareStrategy {
+    double calculate(Location pickup, Location drop);
+}
+public class StandardFareStrategy implements FareStrategy {
+    private double baseFare, ratePerKm;
+    ...
+}
+public class SurgeFareStrategy implements FareStrategy {
+    private FareStrategy base;
+    private double surgeMultiplier;
+    public double calculate(Location p, Location d) { return base.calculate(p, d) * surgeMultiplier; }
+}
+
+public interface DriverMatchingStrategy {
+    Driver findDriver(List<Driver> drivers, Location pickup);
+}
+public class NearestDriverStrategy implements DriverMatchingStrategy { ... }
+public class HighestRatedDriverStrategy implements DriverMatchingStrategy { ... }
+
+public interface RideState {                  // State Pattern
+    void next(Ride ride);
+    void cancel(Ride ride);
+    String getStatus();
+}
+public class RequestedState implements RideState { ... }
+public class AcceptedState implements RideState { ... }
+public class InProgressState implements RideState { ... }
+public class CompletedState implements RideState { ... }
+public class CancelledState implements RideState { ... }
+
+public class Ride {
+    private String id;
+    private Rider rider;
+    private Driver driver;
+    private Location pickup, drop;
+    private RideState state;
+    private double fare;
+    public void nextState() { state.next(this); }
+    public void cancelRide() { state.cancel(this); }
+}
+
+public class RideService {                    // Service Layer
+    private DriverMatchingStrategy matchingStrategy;
+    private FareStrategy fareStrategy;
+    public Ride requestRide(String riderId, Location pickup, Location drop) { ... }
+    public void acceptRide(String rideId) { ... }
+    public void startRide(String rideId) { ... }
+    public void completeRide(String rideId) { ... }
+    public void cancelRide(String rideId) { ... }
+    public void enableSurge(double multiplier) { ... }
+    public void rateDriver(String rideId, double rating) { ... }
 }
 ```
 
@@ -2383,15 +3340,79 @@ BowlerScore - oversBowled, runsConceded, wickets
 
 ### Pattern: **Observer** (live score updates), **Strategy** (scoring rules)
 
-### Key Code Sketch
+### All Entity Skeletons (Java)
 ```java
-public class MatchService {
-    public void recordBall(Ball ball) {
-        innings.getCurrentOver().addBall(ball);
-        scorecard.updateBatsman(ball.getBatsman(), ball.getRunsScored());
-        scorecard.updateBowler(ball.getBowler(), ball.getRunsScored(), ball.isWicket());
-        notifyObservers(scorecard);
-    }
+public enum ExtraType { NONE, WIDE, NO_BALL, BYE, LEG_BYE }
+
+public class CricketPlayer {
+    private String name;
+}
+
+public class Team {
+    private String name;
+    private List<CricketPlayer> players;
+}
+
+public class BatsmanScore {
+    private CricketPlayer player;
+    private int runs, ballsFaced, fours, sixes;
+    private boolean isOut;
+    public void addRuns(int r) { ... }
+    public void out() { ... }
+    public double getStrikeRate() { return ballsFaced == 0 ? 0 : (runs * 100.0) / ballsFaced; }
+}
+
+public class BowlerScore {
+    private CricketPlayer player;
+    private int ballsBowled, runsConceded, wickets;
+    public void addBall(int runs, boolean wicket) { ... }
+    public String getOvers() { ... }          // "3.4" format
+    public double getEconomy() { ... }
+}
+
+public class Ball {
+    private CricketPlayer batsman, bowler;
+    private int runs;
+    private boolean isWicket;
+    private ExtraType extra;
+    public boolean isLegalDelivery() { return extra != WIDE && extra != NO_BALL; }
+}
+
+public class Over {
+    private int overNumber;
+    private CricketPlayer bowler;
+    private List<Ball> balls;
+    public void addBall(Ball ball) { ... }
+    public boolean isComplete() { ... }       // 6 legal deliveries
+}
+
+public class Innings {
+    private Team battingTeam, bowlingTeam;
+    private List<Over> overs;
+    private int totalRuns, wickets;
+    private Map<String, BatsmanScore> batsmanScores;
+    private Map<String, BowlerScore> bowlerScores;
+    public void recordBall(Ball ball) { ... } // updates all stats
+    public boolean isCompleted() { ... }
+    public void displayScorecard() { ... }
+}
+
+public class CricketMatch {
+    private Team team1, team2;
+    private List<Innings> innings;
+    private int oversPerInnings;
+    public Innings startInnings(Team batting, Team bowling) { ... }
+    public String determineResult() { ... }
+}
+
+public class CricketMatchService {            // Service Layer
+    private CricketMatch match;
+    private Innings currentInnings;
+    public void startMatch(Team t1, Team t2, int overs) { ... }
+    public void startInnings(Team batting, Team bowling) { ... }
+    public void recordBall(CricketPlayer batsman, CricketPlayer bowler, int runs, boolean isWicket, ExtraType extra) { ... }
+    public void showScorecard() { ... }
+    public String getResult() { ... }
 }
 ```
 
@@ -2467,23 +3488,90 @@ Application - id, user, job, status, resumeUrl
 
 ### Pattern: **Observer** (feed updates, notifications)
 
-### Key Code Sketch
+### All Entity Skeletons (Java)
 ```java
-public class FeedService {
-    public List<Post> getFeed(User user) {
-        return user.getConnections().stream()
-            .flatMap(c -> c.getPosts().stream())
-            .sorted(Comparator.comparing(Post::getTimestamp).reversed())
-            .limit(50)
-            .collect(Collectors.toList());
-    }
+public enum ConnectionStatus { PENDING, ACCEPTED, REJECTED }
+public enum ApplicationStatus { APPLIED, IN_REVIEW, ACCEPTED, REJECTED }
+
+public class Experience {
+    private String title, company;
+    private LocalDate from, to;
 }
 
-public class ConnectionService {
-    public void sendConnectionRequest(User from, User to) {
-        Connection c = new Connection(from, to, ConnectionStatus.PENDING);
-        to.notify(new ConnectionRequestNotification(from));
-    }
+public class Education {
+    private String degree, institution;
+    private int year;
+}
+
+public class LinkedInProfile {
+    private String headline;
+    private List<Experience> experiences;
+    private List<Education> educations;
+    private List<String> skills;
+    public void addExperience(Experience e) { ... }
+    public void addSkill(String skill) { ... }
+}
+
+public class LinkedInUser {
+    private String id, name, email;
+    private LinkedInProfile profile;
+    private List<LinkedInUser> connections;
+    private List<Post> posts;
+    public void addConnection(LinkedInUser user) { ... }
+    public void addPost(Post post) { ... }
+}
+
+public class ConnectionRequest {
+    private String id;
+    private LinkedInUser from, to;
+    private ConnectionStatus status;
+    public void accept() { from.addConnection(to); to.addConnection(from); status = ACCEPTED; }
+    public void reject() { status = REJECTED; }
+}
+
+public class Post {
+    private String id;
+    private LinkedInUser author;
+    private String content;
+    private List<LinkedInUser> likes;
+    private List<PostComment> comments;
+    private LocalDateTime timestamp;
+    public void addLike(LinkedInUser user) { ... }
+    public void addComment(PostComment c) { ... }
+}
+
+public class PostComment {
+    private String id;
+    private LinkedInUser author;
+    private String body;
+    private LocalDateTime timestamp;
+}
+
+public class JobPosting {
+    private String id, company, title, description;
+    private List<String> requiredSkills;
+    private List<JobApplication> applications;
+    public void addApplication(JobApplication app) { ... }
+}
+
+public class JobApplication {
+    private String id;
+    private LinkedInUser applicant;
+    private JobPosting job;
+    private ApplicationStatus status;
+}
+
+public class LinkedInService {                // Service Layer
+    public LinkedInUser registerUser(String id, String name, String email) { ... }
+    public ConnectionRequest sendConnectionRequest(String fromId, String toId) { ... }
+    public void respondToRequest(String reqId, boolean accept) { ... }
+    public Post createPost(String userId, String content) { ... }
+    public void likePost(String userId, String postId) { ... }
+    public void commentOnPost(String userId, String postId, String body) { ... }
+    public List<Post> getFeed(String userId) { ... }  // connections' posts, reverse-chrono
+    public JobPosting postJob(String company, String title, String desc, List<String> skills) { ... }
+    public JobApplication applyToJob(String userId, String jobId) { ... }
+    public List<JobPosting> searchJobs(String keyword) { ... }
 }
 ```
 
@@ -2569,27 +3657,52 @@ LockerState (interface)
 
 ### Pattern: **State** (locker lifecycle), **Strategy** (assignment)
 
-### Key Code Sketch
+### All Entity Skeletons (Java)
 ```java
-public class LockerService {
-    public String assignLocker(Package pkg, String locationId) {
-        Locker locker = assignmentStrategy.assign(pkg.getSize(), locationId);
-        locker.setPackage(pkg);
-        locker.setState(new OccupiedState());
-        String otp = generateOTP();
-        locker.setOtp(otp);
-        notifyCustomer(pkg.getOrderId(), otp, locker.getId());
-        return otp;
-    }
+public enum LockerSize { SMALL, MEDIUM, LARGE }
 
-    public boolean pickupPackage(String lockerId, String otp) {
-        Locker locker = getLocker(lockerId);
-        if (locker.getOtp().equals(otp) && !isExpired(locker)) {
-            locker.release();
-            return true;
-        }
-        return false;
-    }
+public class LockerPackage {
+    private String id, orderId;
+    private LockerSize size;
+    private LocalDateTime deliveredAt;
+    public void markDelivered() { ... }
+}
+
+public interface LockerState {                // State Pattern
+    void assignPackage(Locker locker, LockerPackage pkg);
+    void pickupPackage(Locker locker, String otp);
+    void expire(Locker locker);
+    String getStateName();
+}
+public class AvailableLockerState implements LockerState { ... }
+public class OccupiedLockerState implements LockerState { ... }
+
+public class Locker {
+    private String id, locationId;
+    private LockerSize size;
+    private LockerState state;
+    private LockerPackage currentPackage;
+    private String otp;
+    public String generateOtp() { ... }       // 6-digit random
+    public void release() { ... }             // clears package + otp, state -> Available
+    public boolean canFit(LockerSize pkgSize) { return size.ordinal() >= pkgSize.ordinal(); }
+    public boolean isAvailable() { ... }
+    public void assignPackage(LockerPackage pkg) { state.assignPackage(this, pkg); }
+    public void pickupPackage(String otp) { state.pickupPackage(this, otp); }
+}
+
+public interface LockerAssignmentStrategy {   // Strategy
+    Locker assign(List<Locker> lockers, LockerSize packageSize);
+}
+public class SizeMatchStrategy implements LockerAssignmentStrategy { ... }  // smallest fitting locker
+
+public class LockerService {                  // Service Layer
+    private Map<String, List<Locker>> lockerLocations;
+    private LockerAssignmentStrategy assignmentStrategy;
+    public void addLockerLocation(String locationId, List<Locker> lockers) { ... }
+    public String assignLocker(LockerPackage pkg, String locationId) { ... }  // returns OTP
+    public boolean pickup(String lockerId, String otp) { ... }
+    public void displayStatus(String locationId) { ... }
 }
 ```
 
@@ -2665,20 +3778,70 @@ Waitlist (per event+category)
 
 ### Pattern: **Observer** (waitlist notification), **Strategy** (pricing)
 
-### Key Code Sketch
+### All Entity Skeletons (Java)
 ```java
-public class TicketService {
-    public Booking holdSeats(User u, Event e, List<Seat> seats) {
-        seats.forEach(s -> { s.hold(); scheduleRelease(s, 10, MINUTES); });
-        double total = pricingStrategy.calculate(seats);
-        return new Booking(u, e, seats, total, BookingStatus.HELD);
-    }
+public enum ConcertSeatStatus { AVAILABLE, HELD, BOOKED }
+public enum ConcertBookingStatus { HELD, CONFIRMED, CANCELLED }
 
-    public void confirmBooking(Booking b, PaymentStrategy ps) {
-        ps.pay(b.getTotal());
-        b.getSeats().forEach(Seat::book);
-        b.setStatus(BookingStatus.CONFIRMED);
-    }
+public class Venue {
+    private String id, name, city;
+    private int capacity;
+}
+
+public class ConcertSeat {
+    private String id, category;
+    private double basePrice;
+    private ConcertSeatStatus status;
+    public synchronized boolean hold() { ... }  // returns false if not AVAILABLE
+    public void book() { ... }
+    public void release() { ... }
+}
+
+public class Event {
+    private String id, name;
+    private Venue venue;
+    private LocalDateTime dateTime;
+    private Map<String, List<ConcertSeat>> seatsByCategory;
+    public void addSeats(String category, List<ConcertSeat> seats) { ... }
+    public List<ConcertSeat> getAvailableSeats(String category) { ... }
+    public int getTotalAvailable() { ... }
+}
+
+public interface ConcertPricingStrategy {     // Strategy
+    double calculatePrice(ConcertSeat seat, Event event);
+}
+public class FixedConcertPricing implements ConcertPricingStrategy { ... }
+public class DemandBasedPricing implements ConcertPricingStrategy { ... }  // price ↑ as seats ↓
+
+public interface WaitlistObserver {           // Observer
+    void onSeatAvailable(Event event, String category);
+}
+
+public class Waitlist {
+    private Map<String, Queue<WaitlistObserver>> waitlists; // category -> queue
+    public void addToWaitlist(String category, WaitlistObserver observer) { ... }
+    public void notifyNext(Event event, String category) { ... }
+}
+
+public class ConcertBooking {
+    private String id;
+    private User user;
+    private Event event;
+    private List<ConcertSeat> seats;
+    private double totalAmount;
+    private ConcertBookingStatus status;
+    public void confirm() { ... }
+    public void cancel() { seats.forEach(ConcertSeat::release); status = CANCELLED; }
+}
+
+public class ConcertTicketService {           // Service Layer
+    private ConcertPricingStrategy pricingStrategy;
+    private Map<String, Waitlist> eventWaitlists;
+    public void addEvent(Event event) { ... }
+    public ConcertBooking holdSeats(User user, String eventId, String category, int count) { ... }
+    public void confirmBooking(String bookingId, PaymentStrategy ps) { ... }
+    public double cancelBooking(String bookingId) { ... }  // refund + notify waitlist
+    public void joinWaitlist(String eventId, String category, WaitlistObserver observer) { ... }
 }
 ```
 
@@ -2762,22 +3925,73 @@ Portfolio
 
 ### Pattern: **Observer** (trade execution notification), **Strategy** (matching), **Command** (order placement)
 
-### Key Code Sketch
+### All Entity Skeletons (Java)
 ```java
+public enum OrderSide { BUY, SELL }
+public enum OrderType { MARKET, LIMIT }
+public enum StockOrderStatus { OPEN, PARTIALLY_FILLED, FILLED, CANCELLED }
+
+public class Stock {
+    private String symbol, name;
+    private double lastTradedPrice;
+    public void updateLTP(double price) { ... }
+}
+
+public class StockOrder implements Comparable<StockOrder> {
+    private String id, userId;
+    private Stock stock;
+    private OrderSide side;
+    private OrderType type;
+    private double price;
+    private int quantity, filledQuantity;
+    private StockOrderStatus status;
+    private LocalDateTime timestamp;
+    public void fill(int qty) { ... }         // updates filledQty + status
+    public int getRemainingQuantity() { return quantity - filledQuantity; }
+    public int compareTo(StockOrder o) { ... } // BUY: highest price first, SELL: lowest first; time tiebreak
+}
+
+public class Trade {
+    private String id;
+    private StockOrder buyOrder, sellOrder;
+    private double price;
+    private int quantity;
+    private LocalDateTime executedAt;
+}
+
+public class OrderBook {                      // per stock
+    private Stock stock;
+    private PriorityQueue<StockOrder> buyOrders;  // MaxHeap by price
+    private PriorityQueue<StockOrder> sellOrders; // MinHeap by price
+    public void addOrder(StockOrder order) { ... }
+}
+
 public class MatchingEngine {
-    public List<Trade> match(OrderBook book) {
-        List<Trade> trades = new ArrayList<>();
-        while (!book.getBuyOrders().isEmpty() && !book.getSellOrders().isEmpty()) {
-            Order buy = book.getBuyOrders().peek();
-            Order sell = book.getSellOrders().peek();
-            if (buy.getPrice() >= sell.getPrice()) {
-                int qty = Math.min(buy.getQuantity(), sell.getQuantity());
-                trades.add(new Trade(buy, sell, sell.getPrice(), qty));
-                // adjust quantities or remove filled orders
-            } else break;
-        }
-        return trades;
-    }
+    public List<Trade> match(OrderBook book) { ... }  // while bestBuy >= bestSell: create Trade
+}
+
+public class Portfolio {
+    private String userId;
+    private Map<String, Integer> holdings;    // symbol -> qty
+    private double realizedPnL;
+    public void addHolding(String symbol, int qty) { ... }
+    public void removeHolding(String symbol, int qty) { ... }
+}
+
+public interface TradeObserver {
+    void onTrade(Trade trade);
+}
+
+public class TradingService {                 // Service Layer
+    private Map<String, OrderBook> orderBooks;
+    private Map<String, Portfolio> portfolios;
+    private MatchingEngine matchingEngine;
+    private List<TradeObserver> observers;
+    public void registerStock(Stock stock) { ... }
+    public void registerUser(String userId) { ... }
+    public StockOrder placeOrder(String userId, String symbol, OrderSide side, OrderType type, double price, int qty) { ... }
+    public void showPortfolio(String userId) { ... }
+    public void showOrderBook(String symbol) { ... }
 }
 ```
 
@@ -2863,22 +4077,91 @@ ActivityLog - id, user, action, field, oldValue, newValue, timestamp
 
 ### Pattern: **State** (task lifecycle), **Observer** (activity notifications)
 
-### Key Code Sketch
+### All Entity Skeletons (Java)
 ```java
-public class TaskService {
-    public Task createTask(Project p, String title, TaskType type, User assignee) {
-        Task t = new Task(title, type, new TodoState());
-        t.setAssignee(assignee);
-        p.addTask(t);
-        logActivity(t, "created");
-        return t;
-    }
+public enum TaskType { STORY, BUG, TASK, EPIC }
+public enum TaskPriority { LOW, MEDIUM, HIGH, CRITICAL }
+public enum SprintStatus { PLANNED, ACTIVE, COMPLETED }
 
-    public void transition(Task t, TaskState newState) {
-        t.getState().next(t); // validates transition
-        logActivity(t, "status changed to " + newState);
-        notifyAssignee(t);
-    }
+public interface TaskState {                  // State Pattern
+    void moveForward(TaskItem task);
+    void moveBackward(TaskItem task);
+    String getStateName();
+}
+public class TodoState implements TaskState { ... }        // forward -> InProgress
+public class InProgressState implements TaskState { ... }  // forward -> InReview
+public class InReviewState implements TaskState { ... }    // forward -> Done
+public class DoneState implements TaskState { ... }        // terminal
+
+public class TaskUser {
+    private String id, name, email;
+}
+
+public class ActivityLog {
+    private TaskUser user;
+    private String action, field, oldValue, newValue;
+    private LocalDateTime timestamp;
+}
+
+public class TaskComment {
+    private String id;
+    private TaskUser author;
+    private String body;
+    private LocalDateTime timestamp;
+}
+
+public class TaskItem {
+    private String id, title, description;
+    private TaskType type;
+    private TaskPriority priority;
+    private TaskState state;
+    private TaskUser assignee, reporter;
+    private Sprint sprint;
+    private List<TaskItem> subTasks;
+    private List<TaskItem> dependencies;      // blocked by these
+    private List<TaskComment> comments;
+    private List<ActivityLog> activityLog;
+    public void moveForward() { ... }         // checks dependencies first
+    public void moveBackward() { ... }
+    public void assign(TaskUser user) { ... } // logs activity
+    public void addSubTask(TaskItem sub) { ... }
+    public void addDependency(TaskItem dep) { ... }
+    public void addComment(TaskComment c) { ... }
+}
+
+public class Sprint {
+    private String id, name;
+    private LocalDate startDate, endDate;
+    private List<TaskItem> tasks;
+    private SprintStatus status;
+    public void addTask(TaskItem task) { ... }
+    public void start() { ... }
+    public void complete() { ... }
+}
+
+public class Project {
+    private String id, name;
+    private List<TaskItem> tasks;
+    private List<Sprint> sprints;
+    private List<TaskUser> members;
+    public void addTask(TaskItem task) { ... }
+    public void addSprint(Sprint sprint) { ... }
+}
+
+public class TaskManagementService {          // Service Layer
+    public TaskUser registerUser(String id, String name, String email) { ... }
+    public Project createProject(String name) { ... }
+    public TaskItem createTask(String projectId, String title, TaskType type, String reporterId) { ... }
+    public void assignTask(String taskId, String userId) { ... }
+    public void moveTaskForward(String taskId) { ... }
+    public void moveTaskBackward(String taskId) { ... }
+    public void addSubTask(String parentId, String childId) { ... }
+    public void addDependency(String taskId, String blockedById) { ... }
+    public void addComment(String taskId, String userId, String body) { ... }
+    public Sprint createSprint(String projectId, String name, LocalDate start, LocalDate end) { ... }
+    public void addTaskToSprint(String sprintId, String taskId, String projectId) { ... }
+    public void showSprintBoard(String sprintId, String projectId) { ... }  // kanban view
+    public void showActivityLog(String taskId) { ... }
 }
 ```
 
