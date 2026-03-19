@@ -1,6 +1,61 @@
 # LLD Handbook — 30 Problems (Complete Interview Reference)
 
-> Each problem: **Functional Requirements → Entities → Class Diagram → Pattern → Key Code → Service Layer → Interview Tips**
+> Each problem: **Functional Requirements → Entities → Class Diagram → Pattern → Key Code → Service Layer → Driver Code → Interview Tips**
+
+---
+
+# 📑 Index (Click to Navigate)
+
+### Framework & Theory
+- [PART 0 · Interview Approach (10-Min Framework)](#part-0--how-to-approach-lld-in-interviews-the-10-minute-framework)
+- [PART 0.5 · SOLID Principles](#part-05--solid-principles-reference-every-problem-against-these)
+- [PART 1 · Design Patterns Deep Dive](#part-1--design-patterns-deep-dive) — [Singleton](#pattern-1-singleton) · [Strategy](#pattern-2-strategy) · [State](#pattern-3-state) · [Observer](#pattern-4-observer) · [Chain of Resp](#pattern-5-chain-of-responsibility) · [Factory](#pattern-6-factory) · [Composite](#pattern-7-composite) · [Mediator](#pattern-8-mediator) · [Command](#pattern-9-command)
+- [PART 1.5 · Reusable Building Blocks](#part-15--common-building-blocks-reusable-across-problems)
+
+### 🟢 Easy (1-7)
+| # | Problem | Jump |
+|---|---------|------|
+| 1 | Parking Lot | [→ Go](#1--parking-lot-) |
+| 2 | Logger System | [→ Go](#2--logger-system-) |
+| 3 | Vending Machine | [→ Go](#3--vending-machine-) |
+| 4 | Stack Overflow (Q&A) | [→ Go](#4--stack-overflow-qa-platform-) |
+| 5 | Library Management | [→ Go](#5--library-management-) |
+| 6 | Tic-Tac-Toe | [→ Go](#6--tic-tac-toe-) |
+| 7 | Traffic Signal | [→ Go](#7--traffic-signal-system-) |
+
+### 🟡 Medium (8-23)
+| # | Problem | Jump |
+|---|---------|------|
+| 8 | Elevator System | [→ Go](#8--elevator-system-) |
+| 9 | In-Memory KV Store | [→ Go](#9--in-memory-key-value-store-) |
+| 10 | LRU Cache | [→ Go](#10--lru-cache-) |
+| 11 | BookMyShow | [→ Go](#11--movie-ticket-booking-bookmyshow-) |
+| 12 | Chess Game | [→ Go](#12--chess-game-) |
+| 13 | Snake & Ladder | [→ Go](#13--snake--ladder-) |
+| 14 | ATM Machine | [→ Go](#14--atm-machine-) |
+| 15 | Shopping Cart | [→ Go](#15--online-shopping-cart-) |
+| 16 | Food Delivery | [→ Go](#16--food-delivery-swiggyzomato-) |
+| 17 | Hotel Booking | [→ Go](#17--hotel-booking-) |
+| 18 | In-Memory File System | [→ Go](#18--in-memory-file-system-) |
+| 19 | Notification Service | [→ Go](#19--notification-service-) |
+| 20 | Chat Application | [→ Go](#20--chat-application-) |
+| 21 | Job Scheduler | [→ Go](#21--in-memory-job-scheduler-) |
+| 22 | Rate Limiter | [→ Go](#22--rate-limiter-) |
+| 23 | Splitwise | [→ Go](#23--splitwise-expense-sharing-) |
+
+### 🔴 Hard (24-30)
+| # | Problem | Jump |
+|---|---------|------|
+| 24 | Ride Sharing (Uber) | [→ Go](#24--ride-sharing-uberola-) |
+| 25 | Cricket Scorecard | [→ Go](#25--cricket-scorecard-cricinfo-) |
+| 26 | LinkedIn | [→ Go](#26--linkedin-) |
+| 27 | Amazon Locker | [→ Go](#27--amazon-locker-) |
+| 28 | Concert Tickets | [→ Go](#28--concert-ticket-system-) |
+| 29 | Stock Exchange | [→ Go](#29--stock-exchange--trading-system-) |
+| 30 | Task Management (Jira) | [→ Go](#30--task-management-jira-like-) |
+
+### Reference
+- [Pattern Cheat Sheet](#pattern-cheat-sheet) · [PART 3 · Revision Tables](#part-3--quick-revision-tables) · [PART 4 · Top 10 Mistakes](#part-4--top-10-interview-mistakes-in-lld) · [PART 5 · Similarity Map](#part-5--problem-similarity-map-if-you-know-x-you-can-solve-y)
 
 ---
 
@@ -359,6 +414,34 @@ public class ParkingLot {
 }
 ```
 
+### 🚀 Driver Code (Full Flow)
+```java
+public class ParkingLotDemo {
+    public static void main(String[] args) {
+        // 1. Setup
+        ParkingLot lot = ParkingLot.getInstance();
+        lot.setFeeStrategy(new HourlyFeeStrategy());
+        lot.addFloor(new Floor(1, createSpots(10, SpotType.COMPACT)));
+        lot.addFloor(new Floor(2, createSpots(5, SpotType.LARGE)));
+
+        // 2. Vehicle enters → get ticket
+        Vehicle car = new Car("KA-01-1234");
+        Ticket ticket = lot.parkVehicle(car);
+        // → Finds floor 1, spot C-01, marks occupied, returns ticket
+
+        // 3. Display availability
+        lot.displayAvailability();
+        // → Floor 1: COMPACT: 9 available | Floor 2: LARGE: 5 available
+
+        // 4. Vehicle exits → pay fee
+        double fee = lot.unparkVehicle(ticket.getTicketId());
+        // → Calculates hours parked × rate, releases spot
+        System.out.println("Fee: ₹" + fee);
+    }
+}
+```
+**Flow**: `Vehicle enters` → `ParkingLot.parkVehicle()` → `Floor.findAvailableSpot()` → `Spot.occupy()` → `return Ticket` → ... → `unparkVehicle(ticketId)` → `FeeStrategy.calculateFee(ticket)` → `Spot.release()`
+
 ### 🎯 Interview Tips
 - **Why Strategy?** "Fee calculation varies — hourly, flat, dynamic. Strategy lets us swap without touching ParkingLot."
 - **Why Singleton?** "Only one parking lot instance system-wide. But mention DI as alternative."
@@ -417,6 +500,28 @@ public abstract class LogHandler {
 }
 ```
 
+### 🚀 Driver Code (Full Flow)
+```java
+public class LoggerDemo {
+    public static void main(String[] args) {
+        // 1. Build handler chain: DEBUG(console) → ERROR(file)
+        LogHandler consoleHandler = new ConsoleHandler(LogLevel.DEBUG);
+        LogHandler fileHandler = new FileHandler(LogLevel.ERROR, "/var/log/app.log");
+        consoleHandler.setNext(fileHandler);
+
+        // 2. Setup singleton logger
+        Logger logger = Logger.getInstance();
+        logger.setHandlerChain(consoleHandler);
+
+        // 3. Log messages — chain decides who handles
+        logger.info("User logged in");   // → ConsoleHandler prints, FileHandler skips (INFO < ERROR)
+        logger.error("DB connection lost"); // → ConsoleHandler prints AND FileHandler writes to file
+        logger.debug("Cache hit ratio: 92%"); // → ConsoleHandler prints
+    }
+}
+```
+**Flow**: `logger.info(msg)` → creates `LogMessage(INFO, msg)` → `handlerChain.handle(msg)` → `ConsoleHandler: severity >= DEBUG? YES → write()` → `next.handle(msg)` → `FileHandler: severity >= ERROR? NO → skip`
+
 ### 🎯 Interview Tips
 - **Why Chain of Responsibility?** "Each handler decides if it processes the log AND forwards to next. Adding a new level/sink doesn't change existing handlers → Open/Closed."
 - **Thread safety**: Use `volatile` for singleton + double-checked locking. Log writes should be thread-safe (synchronized or use a ConcurrentLinkedQueue buffer).
@@ -469,6 +574,30 @@ public interface State {
     void returnChange(VendingMachine vm);
 }
 ```
+
+### 🚀 Driver Code (Full Flow)
+```java
+public class VendingMachineDemo {
+    public static void main(String[] args) {
+        // 1. Setup machine + stock products
+        VendingMachine vm = new VendingMachine();
+        vm.getInventory().addProduct(new Product("A1", "Coke", 40), 5);
+        vm.getInventory().addProduct(new Product("B1", "Chips", 20), 10);
+
+        // 2. User flow: insert money → select → dispense
+        vm.insertMoney(50);         // State: Idle → HasMoney (balance=50)
+        vm.selectProduct("A1");     // State: HasMoney → Dispensing → ReturnChange
+        // Output: "Dispensed: Coke" then "Returning change: ₹10"
+        // State: ReturnChange → Idle
+
+        // 3. Insufficient money flow
+        vm.insertMoney(10);
+        vm.selectProduct("A1");     // "Insufficient balance. Need ₹30 more"
+        vm.returnChange();          // "Returning ₹10", State → Idle
+    }
+}
+```
+**Flow**: `insertMoney()` → `IdleState.insertMoney()` → sets balance, transitions to `HasMoneyState` → `selectProduct()` → validates stock + balance → transitions to `DispensingState` → `dispense()` → reduces inventory, calculates change → `ReturnChangeState` → back to `IdleState`
 
 ### 🎯 Interview Tips
 - **Why State pattern?** "Each state has different behavior for the same action (insertMoney, selectProduct). Without State pattern, you'd have messy if-else chains in every method."
@@ -523,6 +652,39 @@ public class Question {
 }
 ```
 
+### 🚀 Driver Code (Full Flow)
+```java
+public class StackOverflowDemo {
+    public static void main(String[] args) {
+        QnAService service = new QnAService();
+
+        // 1. Register users
+        User alice = service.registerUser("u1", "Alice", "alice@email.com");
+        User bob = service.registerUser("u2", "Bob", "bob@email.com");
+
+        // 2. Alice posts question (auto-subscribes as observer)
+        Question q = service.postQuestion("u1", "How does HashMap work?",
+                "Explain internal implementation", List.of("java", "collections"));
+
+        // 3. Bob posts answer → Alice gets notified (Observer)
+        Answer a = service.postAnswer("u2", q.getId(), "It uses array of linked lists...");
+        // Output: "Notification to Alice: New answer on 'How does HashMap work?' by Bob"
+
+        // 4. Alice upvotes Bob's answer → Bob gets +10 reputation
+        service.upvoteAnswer(q.getId(), a.getId(), "u1");
+        // Bob.reputation: 0 → 10
+
+        // 5. Alice accepts Bob's answer → Bob gets +15 reputation
+        service.acceptAnswer(q.getId(), a.getId());
+        // Bob.reputation: 10 → 25
+
+        // 6. Search by tag
+        List<Question> javaQs = service.searchByTag("java"); // returns [q]
+    }
+}
+```
+**Flow**: `postQuestion()` → creates Question + subscribes author as Observer → `postAnswer()` → adds Answer to Question → `question.notifyObservers()` → all watchers get callback → `upvote()` → adds Vote + updates author reputation
+
 ### 🎯 Interview Tips
 - **Votable interface** — Both Question and Answer support voting → extract a `Votable` interface for DRY
 - **Reputation system**: Upvote on answer = +10 rep, upvote on question = +5, accepted answer = +15. Track this on User.
@@ -574,6 +736,38 @@ public class LibraryService {
 }
 ```
 
+### 🚀 Driver Code (Full Flow)
+```java
+public class LibraryDemo {
+    public static void main(String[] args) {
+        LibraryService lib = new LibraryService();
+
+        // 1. Setup: add books with copies
+        Book java = new Book("ISBN-001", "Effective Java", "Bloch", "Programming");
+        lib.addBook(java, 2); // 2 physical copies
+        lib.registerMember(new Member("M1", "Alice"));
+        lib.registerMember(new Member("M2", "Bob"));
+
+        // 2. Alice borrows copy 1
+        Loan loan1 = lib.borrowBook("M1", "ISBN-001");
+        // → BookItem(barcode=xxx) checked out, dueDate = today+14
+
+        // 3. Bob borrows copy 2
+        Loan loan2 = lib.borrowBook("M2", "ISBN-001");
+
+        // 4. Charlie tries to borrow — no copies left → reservation created
+        lib.registerMember(new Member("M3", "Charlie"));
+        lib.borrowBook("M3", "ISBN-001");
+        // Output: "All copies lent. Reservation created for Charlie"
+
+        // 5. Alice returns (late) → fine + Charlie's reservation auto-fulfilled
+        Fine fine = lib.returnBook(loan1.getLoanId());
+        // → If overdue: Fine of ₹X. Then: "Reservation fulfilled for Charlie"
+    }
+}
+```
+**Flow**: `borrowBook()` → checks `member.canBorrow()` (max 5) → finds available `BookItem` → `bookItem.checkout(dueDate)` → creates `Loan` → if no copy: creates `Reservation` | `returnBook()` → `loan.markReturned()` → `bookItem.returnItem()` → check reservation queue → calculate fine if overdue
+
 ### 🎯 Interview Tips
 - **Book vs BookItem**: Book is metadata (ISBN, title). BookItem is a physical copy (barcode). One Book can have many BookItems. This is the key design insight.
 - **Reservation queue**: When a book is returned, check reservation queue → auto-fulfill the first waiting reservation.
@@ -622,6 +816,27 @@ public class Board {
 }
 ```
 
+### 🚀 Driver Code (Full Flow)
+```java
+public class TicTacToeDemo {
+    public static void main(String[] args) {
+        TicTacToeService game = new TicTacToeService();
+        game.startGame("Alice", "Bob");
+        // "Game started! Alice (X) vs Bob (O)"
+
+        game.playTurn(0, 0); // Alice places X at (0,0)
+        game.playTurn(1, 1); // Bob places O at (1,1)
+        game.playTurn(0, 1); // Alice places X at (0,1)
+        game.playTurn(2, 2); // Bob places O at (2,2)
+        game.playTurn(0, 2); // Alice places X at (0,2) → row 0 complete!
+        // Output: "Alice wins!"
+
+        System.out.println(game.getResult()); // "Alice wins!"
+    }
+}
+```
+**Flow**: `playTurn(row, col)` → `game.makeMove(row, col)` → `board.placePiece(row, col, currentPlayer.piece)` → `board.checkWin(row, col, piece)` → checks row/col/diagonals → if win: set status=WIN | if `board.isFull()`: DRAW | else: switch turn
+
 ### 🎯 Interview Tips
 - **Win check optimization**: Only check row/col/diagonals that include the last placed piece — O(n) instead of O(n²)
 - **Follow-up: NxN board** — Generalize to NxN. Win condition = N in a row.
@@ -667,6 +882,29 @@ public interface SignalState {
     String getColor();
 }
 ```
+
+### 🚀 Driver Code (Full Flow)
+```java
+public class TrafficSignalDemo {
+    public static void main(String[] args) {
+        // 1. Setup intersection
+        Intersection intersection = new Intersection("Main St & 5th Ave");
+        intersection.addSignal(new TrafficSignal(new Road("Main St"), new GreenState(30)));
+        intersection.addSignal(new TrafficSignal(new Road("5th Ave"), new RedState(30)));
+
+        TrafficSignalService controller = new TrafficSignalService(intersection);
+
+        // 2. Normal cycle
+        controller.startCycle();  // Main St: GREEN→YELLOW, 5th Ave: RED→GREEN
+        controller.displayStatus();
+
+        // 3. Emergency override
+        controller.emergencyOverride("5th Ave");
+        // → 5th Ave forced GREEN(60s), Main St forced RED(60s)
+    }
+}
+```
+**Flow**: `startCycle()` → for each signal: `signal.transition()` → `currentState.next()` → Green returns Yellow, Yellow returns Red, Red returns Green | `emergencyOverride(road)` → target road: `forceState(GreenState)`, all others: `forceState(RedState)`
 
 ### 🎯 Interview Tips
 - **State Pattern fits perfectly**: Green → Yellow → Red → Green. Each state knows its duration and its next state.
@@ -727,6 +965,34 @@ public class NearestElevatorScheduler implements Scheduler {
 }
 ```
 
+### 🚀 Driver Code (Full Flow)
+```java
+public class ElevatorDemo {
+    public static void main(String[] args) {
+        // 1. Setup building: 10 floors, 3 elevators, nearest scheduler
+        Building building = new Building(10, 3, new NearestElevatorScheduler());
+        ElevatorService service = new ElevatorService(building);
+
+        // 2. User on floor 3 wants to go to floor 7
+        service.requestElevator(3, 7);
+        // → Scheduler picks nearest elevator (e.g., Elevator 0 at floor 0)
+        // → Adds stops: floor 3 (pickup) and floor 7 (destination)
+
+        // 3. Another request: floor 5 → floor 1
+        service.requestElevator(5, 1);
+
+        // 4. Simulate steps — elevator moves one stop at a time
+        service.step(); // Elevator 0 → floor 3 (pickup)
+        service.step(); // Elevator 0 → floor 7 (drop)
+        service.step(); // Elevator 1 → floor 5 (pickup)
+
+        service.displayStatus();
+        // Elevator 0: Floor 7 | IDLE | Elevator 1: Floor 5 | DOWN
+    }
+}
+```
+**Flow**: `requestElevator(src, dest)` → `scheduler.assignElevator(elevators, request)` → picks nearest idle/same-direction → `elevator.addRequest(src)` + `elevator.addRequest(dest)` → `step()` → elevator pops next stop from TreeSet → moves → `notifyObservers()` for floor display
+
 ### 🎯 Interview Tips
 - **Three patterns, three concerns**: Strategy (which elevator?), State (elevator behavior), Observer (floor display updates)
 - **SCAN Algorithm**: Serve all requests in current direction before reversing — like a disk arm. Use two TreeSets (upStops, downStops).
@@ -774,6 +1040,33 @@ public class KVStore {
     public void delete(String key) { ... }
 }
 ```
+
+### 🚀 Driver Code (Full Flow)
+```java
+public class KVStoreDemo {
+    public static void main(String[] args) throws InterruptedException {
+        KVStore store = KVStore.getInstance();
+
+        // 1. Basic CRUD
+        store.put("user:1", "Alice");
+        store.put("user:2", "Bob");
+        System.out.println(store.get("user:1")); // "Alice"
+        store.delete("user:2");
+
+        // 2. TTL — key expires after 2 seconds
+        store.put("session:abc", "token123", 2000);
+        System.out.println(store.get("session:abc")); // "token123"
+        Thread.sleep(3000);
+        System.out.println(store.get("session:abc")); // null (expired)
+
+        // 3. Snapshot for persistence
+        store.put("config:timeout", "30");
+        Map<String, String> snapshot = store.snapshot();
+        // → {"user:1": "Alice", "config:timeout": "30"} (expired keys excluded)
+    }
+}
+```
+**Flow**: `put(key, val, ttl)` → creates `Entry(key, val, ttl)` → stores in `ConcurrentHashMap` | `get(key)` → retrieves Entry → `entry.isExpired()?` YES→remove+return null, NO→return value | Background `ScheduledExecutorService` runs `evictExpired()` every 1s
 
 ### 🎯 Interview Tips
 - **TTL eviction strategies**: Lazy (check on GET) vs Active (background thread scans periodically) vs Both (hybrid like Redis)
@@ -835,6 +1128,33 @@ public class LRUCache<K, V> {
 }
 ```
 
+### 🚀 Driver Code (Full Flow)
+```java
+public class LRUCacheDemo {
+    public static void main(String[] args) {
+        LRUCache<String, String> cache = new LRUCache<>(3); // capacity=3
+
+        // 1. Fill cache
+        cache.put("a", "1");  // DLL: [a]
+        cache.put("b", "2");  // DLL: [b, a]
+        cache.put("c", "3");  // DLL: [c, b, a]
+
+        // 2. Access "a" → moves to front
+        cache.get("a");       // DLL: [a, c, b]
+
+        // 3. Insert "d" → cache full → evicts LRU ("b")
+        cache.put("d", "4");  // DLL: [d, a, c] — "b" evicted!
+
+        System.out.println(cache.get("b")); // null (evicted)
+        System.out.println(cache.get("a")); // "1" (still there)
+
+        // 4. Update existing key
+        cache.put("c", "33"); // DLL: [c, a, d] — "c" updated + moved to front
+    }
+}
+```
+**Flow**: `get(key)` → `map.get(key)` → if found: `dll.moveToFront(node)` + return value | `put(key, val)` → if exists: update + moveToFront | if new: check `size == capacity?` → YES: `dll.removeLast()` + `map.remove(evicted.key)` → `dll.addToFront(newNode)` + `map.put(key, node)`
+
 ### 🎯 Interview Tips
 - **Key insight**: HashMap gives O(1) lookup, DLL gives O(1) move-to-front and remove-last. Together → O(1) for everything.
 - **Dummy nodes**: Use dummy head + dummy tail in DLL to avoid null checks on insert/remove.
@@ -885,6 +1205,37 @@ public class BookingService {
     }
 }
 ```
+
+### 🚀 Driver Code (Full Flow)
+```java
+public class BookMyShowDemo {
+    public static void main(String[] args) {
+        BookingService bookingService = new BookingService();
+
+        // 1. Setup
+        Movie movie = new Movie("M1", "Inception", "Sci-Fi", 148);
+        Screen screen = new Screen("S1", createSeats(100)); // 100 seats
+        Show show = new Show("SH1", movie, screen, LocalDateTime.of(2026, 3, 20, 18, 0));
+
+        // 2. User selects seats
+        User user = new User("U1", "Alice", "alice@email.com");
+        List<Seat> selected = List.of(show.getAvailableSeats().get(0),
+                                      show.getAvailableSeats().get(1));
+
+        // 3. Initiate booking → seats LOCKED for 5 min
+        Booking booking = bookingService.initiateBooking(user, show, selected);
+        // → Seats status: AVAILABLE → LOCKED. Timer starts (5 min auto-release)
+
+        // 4. Confirm with payment
+        bookingService.confirmBooking(booking.getId(), new UPIPayment("alice@upi"));
+        // → Paid ₹500 via UPI. Seats: LOCKED → BOOKED. Notification sent.
+
+        // 5. If user doesn't pay → auto-release after 5 min
+        // bookingService.cancelBooking(booking.getId()); // manual cancel also works
+    }
+}
+```
+**Flow**: `initiateBooking()` → `show.lockSeats(seats)` [synchronized] → schedule 5-min auto-release → `confirmBooking()` → `paymentStrategy.pay(total)` → `show.bookSeats()` → LOCKED→BOOKED → notify user
 
 ### 🎯 Interview Tips
 - **Seat locking is the CORE challenge**: Temporary hold (5 min) prevents double-booking. Use `ScheduledExecutorService` for auto-release.
@@ -944,6 +1295,27 @@ public class Knight extends Piece {
 }
 ```
 
+### 🚀 Driver Code (Full Flow)
+```java
+public class ChessDemo {
+    public static void main(String[] args) {
+        ChessGameService service = new ChessGameService();
+        service.startGame("Alice", "Bob");
+
+        // Alice (White) moves knight
+        service.playMove(7, 1, 5, 2); // Knight from (7,1) to (5,2)
+        // Bob (Black) moves pawn
+        service.playMove(1, 4, 3, 4); // Pawn from (1,4) to (3,4)
+        // Alice moves bishop
+        service.playMove(7, 2, 4, 5); // Bishop from (7,2) to (4,5)
+
+        // Invalid move example:
+        service.playMove(0, 0, 5, 5); // "Invalid move for ♜" (Rook can't move diagonal)
+    }
+}
+```
+**Flow**: `playMove(fromX, fromY, toX, toY)` → get Cell from/to → validate piece color == currentTurn → `piece.canMove(board, from, to)` [polymorphic dispatch: Knight/Rook/etc.] → if valid: move piece, capture if occupied → add to `moveHistory` → switch turn
+
 ### 🎯 Interview Tips
 - **Polymorphism over Strategy here**: Each piece IS a different type with different `canMove()`. This is natural polymorphism.
 - **Path blocking**: Rook/Bishop/Queen need `isPathClear()` — iterate step-by-step between from → to checking for obstacles. Knight JUMPS (no path check).
@@ -1002,6 +1374,29 @@ public class Game {
 }
 ```
 
+### 🚀 Driver Code (Full Flow)
+```java
+public class SnakeLadderDemo {
+    public static void main(String[] args) {
+        Board board = new Board(10); // 10x10 = 100 cells
+        board.addSnake(99, 10);  // nearly won? back to 10!
+        board.addSnake(52, 28);
+        board.addLadder(2, 38);  // early ladder boost
+        board.addLadder(28, 84);
+
+        List<Player> players = List.of(new Player("Alice"), new Player("Bob"));
+        Dice dice = new Dice(1, 6); // 1 die, 6 faces
+
+        SnakeLadderGame game = new SnakeLadderGame(board, players, dice);
+        game.play();
+        // Output: "Alice rolled 4 | 0 → 4"
+        //         "Bob rolled 2 | 0 → 2"  "  Climbed ladder! From 2 to 38"
+        //         ... "Alice WINS!"
+    }
+}
+```
+**Flow**: `play()` → loop while no winner → `players.poll()` → `dice.roll()` → `newPos = pos + rolled` → `board.getFinalPosition(newPos)` [checks snakes Map then ladders Map] → if exceeds board: stay → if == 100: winner! → else `players.offer(player)`
+
 ### 🎯 Interview Tips
 - **Board design**: Use `Map<Integer, Integer>` for both snakes (head→tail) and ladders (bottom→top). `getFinalPosition()` checks both maps.
 - **Queue for players**: Natural turn-order with `poll()` and `offer()`.
@@ -1059,6 +1454,32 @@ public abstract class CashHandler {
     }
 }
 ```
+
+### 🚀 Driver Code (Full Flow)
+```java
+public class ATMDemo {
+    public static void main(String[] args) {
+        // 1. Setup bank + ATM
+        BankService bank = new BankService();
+        bank.addAccount(new Account("ACC001", 50000, "1234"));
+        ATM atm = new ATM(bank); // cash: 100x₹500, 100x₹200, 100x₹100
+
+        Card card = new Card("CARD-001", "ACC001");
+
+        // 2. Withdrawal flow
+        atm.insertCard(card);   // State: Idle → CardInserted
+        atm.enterPin("1234");   // State: CardInserted → Authenticated
+        atm.withdraw(1700);     // Dispensing: 3x₹500 + 1x₹200
+        // Output: "3 x ₹500" "1 x ₹200" "Remaining balance: ₹48300"
+        atm.ejectCard();        // State: Authenticated → Idle
+
+        // 3. Wrong PIN flow
+        atm.insertCard(card);
+        atm.enterPin("0000");   // "Invalid PIN." State → Idle, card ejected
+    }
+}
+```
+**Flow**: State machine: `Idle` →[insertCard]→ `CardInserted` →[enterPin+validate]→ `Authenticated` →[withdraw]→ checks balance + ATM cash → `CashHandler chain: ₹500Handler.dispense(1700)` → dispenses 3×500=1500, remainder=200 → `₹200Handler.dispense(200)` → 1×200 → done → [ejectCard] → `Idle`
 
 ### 🎯 Interview Tips
 - **Two patterns, two problems**: State = ATM flow (insert card → enter PIN → transact). Chain of Resp = cash dispensing (₹500 → ₹200 → ₹100).
@@ -1119,6 +1540,33 @@ public class CheckoutService {
 }
 ```
 
+### 🚀 Driver Code (Full Flow)
+```java
+public class ShoppingCartDemo {
+    public static void main(String[] args) {
+        ShoppingService shop = new ShoppingService();
+
+        // 1. Setup catalog + coupons
+        shop.addToCatalog(new Product("P1", "Laptop", 50000, "Electronics"));
+        shop.addToCatalog(new Product("P2", "Mouse", 500, "Electronics"));
+        shop.addCoupon(new Coupon("SAVE10", 10.0, LocalDate.of(2026, 12, 31)));
+
+        // 2. Add to cart
+        shop.addToCart("user1", "P1", 1);  // 1 laptop
+        shop.addToCart("user1", "P2", 2);  // 2 mice
+
+        // 3. Checkout with coupon + UPI
+        Order order = shop.checkout("user1",
+                new UPIPayment("user@upi"), "SAVE10");
+        // Cart total: 50000 + 1000 = 51000
+        // Coupon SAVE10 (10%): 51000 → 45900
+        // "Paid ₹45900 via UPI"
+        // "Order placed: ORD-xxx"
+    }
+}
+```
+**Flow**: `addToCart()` → `cart.addItem(product, qty)` [merge if exists] → `checkout()` → `cart.getTotal()` → if coupon: `coupon.isValid()` + `coupon.apply(total)` → `paymentStrategy.pay(discountedTotal)` → create `Order(items, total)` → `cart.clear()` → `notifyUser()`
+
 ### 🎯 Interview Tips
 - **Cart is a temporary object** — Order is the permanent record. Cart → Order at checkout.
 - **Coupon validation**: Check expiry, usage limits, min order value. Strategy pattern for different discount types (flat, percent, BOGO).
@@ -1171,6 +1619,37 @@ public class OrderService {
 }
 ```
 
+### 🚀 Driver Code (Full Flow)
+```java
+public class FoodDeliveryDemo {
+    public static void main(String[] args) {
+        FoodDeliveryService service = new FoodDeliveryService(new NearestAgentStrategy());
+
+        // 1. Register restaurants + agents
+        Restaurant r = new Restaurant("R1", "Pizza Palace", new Location(12.9, 77.6));
+        r.addMenuItem(new MenuItem("M1", "Margherita", 250));
+        r.addMenuItem(new MenuItem("M2", "Garlic Bread", 150));
+        service.registerRestaurant(r);
+        service.registerAgent(new DeliveryAgent("A1", "Ravi", new Location(12.91, 77.61)));
+
+        // 2. User places order
+        FoodOrder order = service.placeOrder(user, "R1",
+                List.of("M1", "M2"), new UPIPayment("user@upi"));
+        // → Paid ₹400. Agent Ravi assigned (nearest). Status: PLACED
+
+        // 3. Track order status transitions
+        service.updateOrderStatus(order.getId(), FoodOrderStatus.PREPARING);
+        service.updateOrderStatus(order.getId(), FoodOrderStatus.PICKED_UP);
+        service.updateOrderStatus(order.getId(), FoodOrderStatus.DELIVERED);
+        // → Agent Ravi marked available again
+
+        // 4. Rate the agent
+        service.rateAgent(order.getId(), 4.5);
+    }
+}
+```
+**Flow**: `placeOrder()` → `restaurant.getMenu()` filter by itemIds → `paymentStrategy.pay(total)` → `agentStrategy.assign(agents, restaurantLocation)` [picks nearest available] → `agent.assignOrder()` → create FoodOrder(PLACED) | Status transitions: PLACED→PREPARING→PICKED_UP→DELIVERED → agent freed
+
 ### 🎯 Interview Tips
 - **Two Strategy decisions**: (1) Agent assignment (nearest, round-robin, load-balanced). (2) Payment method.
 - **Order status is key**: Placed → Preparing → PickedUp → Delivered. Each transition notifies all observers (user, restaurant, agent dashboard).
@@ -1218,6 +1697,38 @@ public class BookingService {
     }
 }
 ```
+
+### 🚀 Driver Code (Full Flow)
+```java
+public class HotelBookingDemo {
+    public static void main(String[] args) {
+        HotelBookingService service = new HotelBookingService(new StandardPricing());
+
+        // 1. Setup hotel + rooms
+        Hotel hotel = new Hotel("H1", "Grand Hyatt", "Mumbai");
+        hotel.addRoom(new Room("R101", RoomType.DOUBLE, 5000));
+        hotel.addRoom(new Room("R102", RoomType.SUITE, 12000));
+        service.registerHotel(hotel);
+
+        // 2. Search available rooms
+        List<Room> rooms = service.searchRooms("Mumbai", RoomType.DOUBLE,
+                LocalDate.of(2026, 4, 10), LocalDate.of(2026, 4, 12));
+        // → [Room R101 - DOUBLE - ₹5000/night]
+
+        // 3. Book room
+        Guest guest = new Guest("G1", "Alice", "alice@email.com");
+        HotelBooking booking = service.bookRoom(guest, rooms.get(0),
+                LocalDate.of(2026, 4, 10), LocalDate.of(2026, 4, 12),
+                new CardPayment("4111111111111111"));
+        // → Paid ₹10000 (2 nights × 5000). Booking confirmed.
+
+        // 4. Cancel → 50% refund
+        double refund = service.cancelBooking(booking.getId());
+        // → "Refund: ₹5000"
+    }
+}
+```
+**Flow**: `searchRooms(city, type, in, out)` → filter hotels by city → `room.isAvailable(in, out)` [check no booking overlap] → `bookRoom()` → `pricingStrategy.calculate(room, in, out)` → `paymentStrategy.pay(total)` → `room.addBooking()` → notify guest
 
 ### 🎯 Interview Tips
 - **Room availability is a DATE RANGE problem**: `isAvailable(checkIn, checkOut)` = no existing booking overlaps with this range. Overlap: `newCheckIn < existingCheckOut && newCheckOut > existingCheckIn`.
@@ -1272,6 +1783,39 @@ public class Directory extends Entry {
     public void addEntry(Entry e) { children.put(e.getName(), e); e.parent = this; }
 }
 ```
+
+### 🚀 Driver Code (Full Flow)
+```java
+public class FileSystemDemo {
+    public static void main(String[] args) {
+        FileSystemService fs = new FileSystemService();
+
+        // 1. Create directory structure
+        fs.createDirectory("home");
+        fs.navigate("home");          // pwd: /home
+        fs.createDirectory("documents");
+        fs.createFile("readme.txt", "Hello World!");
+
+        // 2. List contents
+        fs.listContents();
+        // → Contents of /home:
+        //     documents/
+        //     readme.txt
+
+        // 3. Navigate + read
+        System.out.println(fs.readFile("readme.txt")); // "Hello World!"
+
+        // 4. Search from anywhere
+        List<String> found = fs.search("readme.txt");
+        // → ["/home/readme.txt"]
+
+        // 5. Delete
+        fs.navigate(".."); // back to /
+        fs.delete("home");  // deletes /home and everything inside (recursive)
+    }
+}
+```
+**Flow**: `mkdir(name)` → `currentDir.addEntry(new Directory(name))` | `touch(name)` → `currentDir.addEntry(new File(name))` | `cd(path)` → if "..": go to parent, if "/": go to root, else: `currentDir.getEntry(path)` cast to Directory | `getSize()` → recursive: File returns content.length, Directory sums children
 
 ### 🎯 Interview Tips
 - **Composite is THE pattern here**: File and Directory both extend Entry. Directory contains Entry children (which can be File or Directory). `getSize()` is recursive.
@@ -1329,6 +1873,35 @@ public class NotificationService {
 }
 ```
 
+### 🚀 Driver Code (Full Flow)
+```java
+public class NotificationDemo {
+    public static void main(String[] args) {
+        NotificationService service = new NotificationService();
+
+        // 1. Register template
+        service.registerTemplate(new Template("T1", "OrderUpdate",
+                "Hi {name}, your order {orderId} is {status}"));
+
+        // 2. Set user preference: Email + Push
+        service.setUserPreference(new UserPreference("U1",
+                List.of(ChannelType.EMAIL, ChannelType.PUSH)));
+
+        // 3. Send notification → goes to both Email and Push
+        service.send("U1", "T1",
+                Map.of("name", "Alice", "orderId", "ORD-123", "status", "shipped"),
+                Priority.HIGH);
+        // Output:
+        //   EMAIL → [HIGH] Hi Alice, your order ORD-123 is shipped
+        //   PUSH  → [HIGH] Hi Alice, your order ORD-123 is shipped
+
+        // 4. If send fails → goes to retry queue
+        service.processRetryQueue(); // retries failed notifications
+    }
+}
+```
+**Flow**: `send(userId, templateId, params, priority)` → `template.render(params)` [replaces {placeholders}] → get user's preferred channels → for each channel: `channelFactory.createChannel(type)` → `channel.send(notification)` → if fails: add to retryQueue with incrementRetry()
+
 ### 🎯 Interview Tips
 - **Three patterns, three concerns**: Strategy (which channel), Factory (create channel), Observer (users subscribe to topics).
 - **Template rendering**: `"Hello {name}, your order {orderId} is {status}"` → replace placeholders with params map.
@@ -1375,6 +1948,40 @@ public class ChatMediator {
     }
 }
 ```
+
+### 🚀 Driver Code (Full Flow)
+```java
+public class ChatAppDemo {
+    public static void main(String[] args) {
+        ChatService chat = new ChatService();
+
+        // 1. Register users + go online
+        ChatUser alice = chat.registerUser("U1", "Alice");
+        ChatUser bob = chat.registerUser("U2", "Bob");
+        ChatUser charlie = chat.registerUser("U3", "Charlie");
+        alice.goOnline(); bob.goOnline();
+
+        // 2. Start 1-to-1 conversation
+        Conversation dm = chat.startOneToOne("U1", "U2");
+        chat.sendMessage("U1", dm.getId(), "Hey Bob!", MessageType.TEXT);
+        // Output: [Bob] received: Hey Bob! (from Alice)
+
+        // 3. Create group chat
+        GroupConversation group = chat.createGroup("Weekend Plans", "U1");
+        chat.addToGroup(group.getId(), "U2");
+        chat.addToGroup(group.getId(), "U3");
+
+        charlie.goOnline();
+        chat.sendMessage("U1", group.getId(), "Hiking on Saturday?", MessageType.TEXT);
+        // Output: [Bob] received: Hiking on Saturday? (from Alice)
+        //         [Charlie] received: Hiking on Saturday? (from Alice)
+
+        // 4. Message history
+        List<Message> history = chat.getHistory(dm.getId()); // all DM messages
+    }
+}
+```
+**Flow**: `sendMessage(senderId, convId, content, type)` → creates `Message(sender, content, type)` → `chatMediator.sendMessage(msg, conversation)` → `conversation.addMessage(msg)` → for each participant (except sender): `user.receive(msg)` → if ONLINE: mark DELIVERED
 
 ### 🎯 Interview Tips
 - **Mediator is key here**: Users don't communicate directly. ChatMediator routes messages → reduces N×N connections to N×1.
@@ -1437,6 +2044,37 @@ public class JobScheduler {
 }
 ```
 
+### 🚀 Driver Code (Full Flow)
+```java
+public class JobSchedulerDemo {
+    public static void main(String[] args) throws InterruptedException {
+        JobSchedulerService scheduler = new JobSchedulerService(4); // 4 worker threads
+
+        // 1. One-time job (runs after 2 seconds)
+        scheduler.scheduleOneTime("SendReport",
+                () -> System.out.println("Report sent!"), 2000, 1);
+
+        // 2. Recurring job (every 5 seconds)
+        scheduler.scheduleRecurring("CleanupCache",
+                () -> System.out.println("Cache cleaned!"), 5000, 2);
+
+        // 3. High priority job (runs first if same time)
+        scheduler.scheduleOneTime("AlertAdmin",
+                () -> System.out.println("Admin alerted!"), 0, 0); // priority=0 = highest
+
+        // Output timeline:
+        // t=0s: "Admin alerted!" "\u2713 Job completed: AlertAdmin"
+        // t=2s: "Report sent!" "\u2713 Job completed: SendReport"
+        // t=5s: "Cache cleaned!" (then re-scheduled for t=10s)
+        // t=10s: "Cache cleaned!" (recurring)
+
+        Thread.sleep(12000);
+        scheduler.shutdown();
+    }
+}
+```
+**Flow**: `scheduleOneTime()` → creates Job(scheduledTime=now+delay) → `queue.offer(job)` | Scheduler thread: `queue.peek()` → `job.isReady()?` → YES: `executor.submit(job.task)` → `onCompleted()` callback → if recurring: `job.nextOccurrence()` → re-submit
+
 ### 🎯 Interview Tips
 - **PriorityBlockingQueue is the backbone**: Jobs sorted by (scheduledTime, priority). `take()` blocks when empty.
 - **Recurring jobs**: After completion, calculate next occurrence and re-submit to queue.
@@ -1486,6 +2124,31 @@ public class TokenBucketStrategy implements RateLimitStrategy {
     }
 }
 ```
+
+### 🚀 Driver Code (Full Flow)
+```java
+public class RateLimiterDemo {
+    public static void main(String[] args) {
+        RateLimiterService service = new RateLimiterService();
+
+        // 1. Configure: /api/search = 3 requests per 10 seconds (Token Bucket)
+        service.configureApi("/api/search", new TokenBucketStrategy(3, 3333));
+
+        // 2. Simulate requests
+        String clientId = "user-123";
+        System.out.println(service.checkRequest("/api/search", clientId)); // true (token 3→2)
+        System.out.println(service.checkRequest("/api/search", clientId)); // true (token 2→1)
+        System.out.println(service.checkRequest("/api/search", clientId)); // true (token 1→0)
+        System.out.println(service.checkRequest("/api/search", clientId)); // false! Rate limited
+        // Output: "Rate limited: user-123 on /api/search"
+
+        // 3. After waiting, tokens refill
+        Thread.sleep(4000); // ~1 token refilled
+        System.out.println(service.checkRequest("/api/search", clientId)); // true again
+    }
+}
+```
+**Flow**: `checkRequest(api, clientId)` → `rateLimiter.isAllowed(clientId)` → `strategy.allowRequest(clientId)` → TokenBucket: calculate `tokensToAdd = elapsed / refillInterval` → `tokens = min(max, tokens + toAdd)` → if tokens > 0: `tokens--`, return true | else: return false
 
 ### 🎯 Interview Tips
 - **Know all 3 algorithms deeply**:
@@ -1544,6 +2207,45 @@ public class ExpenseService {
     }
 }
 ```
+
+### 🚀 Driver Code (Full Flow)
+```java
+public class SplitwiseDemo {
+    public static void main(String[] args) {
+        SplitwiseService service = new SplitwiseService();
+
+        // 1. Register users
+        service.registerUser("U1", "Alice", "alice@email.com");
+        service.registerUser("U2", "Bob", "bob@email.com");
+        service.registerUser("U3", "Charlie", "charlie@email.com");
+
+        // 2. Create group
+        SplitwiseGroup group = service.createGroup("Trip", List.of("U1", "U2", "U3"));
+
+        // 3. Alice pays ₹900 for dinner → split equally
+        service.addExpense(group.getId(), "U1", 900, "Dinner", SplitType.EQUAL,
+                List.of(new EqualSplit(users.get("U1")),
+                        new EqualSplit(users.get("U2")),
+                        new EqualSplit(users.get("U3"))));
+        // Each owes ₹300. Bob owes Alice ₹300, Charlie owes Alice ₹300
+
+        // 4. Bob pays ₹600 for cab → split by percentage
+        service.addExpense(group.getId(), "U2", 600, "Cab", SplitType.PERCENT,
+                List.of(new PercentSplit(alice, 50),   // ₹300
+                        new PercentSplit(bob, 25),     // ₹150
+                        new PercentSplit(charlie, 25))); // ₹150
+
+        // 5. Show balances (netted)
+        service.showBalances();
+        // Alice owes Bob: ₹300 - ₹300 = ₹0  (net: nothing)
+        // Charlie owes Alice: ₹300, Charlie owes Bob: ₹150
+
+        // 6. Settle up
+        service.settleUp("U3", "U1", 300); // Charlie pays Alice ₹300
+    }
+}
+```
+**Flow**: `addExpense(paidBy, amount, splits)` → based on SplitType: EQUAL→amount/N each, PERCENT→amount×%/100 each, EXACT→as given → validate splits sum == total → for each split: `balanceSheet.update(paidBy, owes, splitAmount)` → netted in Map<userId, Map<userId, Double>>
 
 ### 🎯 Interview Tips
 - **Three split types, one Strategy**: Equal (amount / N), Exact (user provides each share), Percent (user provides %). Validate: shares must add up to total.
@@ -1605,6 +2307,41 @@ public class RideService {
 }
 ```
 
+### 🚀 Driver Code (Full Flow)
+```java
+public class RideSharingDemo {
+    public static void main(String[] args) {
+        RideService service = new RideService(
+                new NearestDriverStrategy(),
+                new StandardFareStrategy(50, 12)); // base ₹50 + ₹12/km
+
+        // 1. Register
+        service.registerDriver(new Driver("D1", "Ravi", new Location(12.9, 77.6), "KA-01-1234"));
+        service.registerRider(new Rider("R1", "Alice", new Location(12.91, 77.61)));
+
+        // 2. Request ride
+        Ride ride = service.requestRide("R1",
+                new Location(12.91, 77.61),  // pickup
+                new Location(12.95, 77.65)); // drop
+        // → "Ride requested. Driver: Ravi | Fare: ₹120.00"
+
+        // 3. State transitions
+        service.acceptRide(ride.getId());   // REQUESTED → ACCEPTED
+        service.startRide(ride.getId());    // ACCEPTED → IN_PROGRESS
+        service.completeRide(ride.getId()); // IN_PROGRESS → COMPLETED, driver freed
+
+        // 4. Enable surge pricing (2x)
+        service.enableSurge(2.0);
+        // Next ride: fare = (50 + 12*distance) × 2.0
+
+        // 5. Rate
+        service.rateDriver(ride.getId(), 5.0);
+        service.rateRider(ride.getId(), 4.5);
+    }
+}
+```
+**Flow**: `requestRide()` → `matchingStrategy.findDriver(drivers, pickup)` → `fareStrategy.calculate(pickup, drop)` → driver.setAvailable(false) → create Ride(RequestedState) | State machine: `nextState()` delegates to current state → `RequestedState.next()` → sets AcceptedState → ... → `CompletedState`: driver freed
+
 ### 🎯 Interview Tips
 - **This is a pattern-heavy problem — use 3 patterns**: Strategy (fare + driver matching), State (ride lifecycle), Observer (live tracking). Explain WHY each.
 - **Surge pricing**: `SurgeFareStrategy` wraps a base strategy with a multiplier. Decorator-like. Triggered by demand/supply ratio.
@@ -1657,6 +2394,42 @@ public class MatchService {
     }
 }
 ```
+
+### 🚀 Driver Code (Full Flow)
+```java
+public class CricketDemo {
+    public static void main(String[] args) {
+        CricketMatchService service = new CricketMatchService();
+
+        Team india = new Team("India", List.of(
+                new CricketPlayer("Rohit"), new CricketPlayer("Kohli") /*...*/));
+        Team aus = new Team("Australia", List.of(
+                new CricketPlayer("Smith"), new CricketPlayer("Starc") /*...*/));
+
+        // 1. Start match
+        service.startMatch(india, aus, 20); // T20: 20 overs
+
+        // 2. India bats first
+        service.startInnings(india, aus);
+        service.recordBall(rohit, starc, 4, false, ExtraType.NONE);  // Rohit hits 4
+        service.recordBall(rohit, starc, 0, false, ExtraType.WIDE);  // Wide! +1 run, re-bowl
+        service.recordBall(rohit, starc, 0, true, ExtraType.NONE);   // WICKET! Rohit out
+        service.recordBall(kohli, starc, 6, false, ExtraType.NONE);  // Kohli hits 6!
+
+        // 3. Show scorecard
+        service.showScorecard();
+        // === India Innings ===
+        // Total: 11/1
+        // Batting: Rohit: 4(2) [4s:1, 6s:0] SR:200.0 OUT
+        //          Kohli: 6(1) [4s:0, 6s:1] SR:600.0 NOT OUT
+        // Bowling: Starc: 0.4 overs - 11/1, Eco: 16.5
+
+        // 4. After both innings
+        System.out.println(service.getResult()); // "India wins by 20 runs"
+    }
+}
+```
+**Flow**: `recordBall(batsman, bowler, runs, isWicket, extra)` → create Ball → `innings.recordBall(ball)` → update BatsmanScore (runs, fours, sixes) → update BowlerScore (balls, runs, wickets) → add to current Over → if `over.isComplete()`: start new Over → `notifyObservers(scorecard)` for live display
 
 ### 🎯 Interview Tips
 - **Entity hierarchy matters**: Match → Innings → Over → Ball. Each level aggregates stats from the level below.
@@ -1713,6 +2486,42 @@ public class ConnectionService {
     }
 }
 ```
+
+### 🚀 Driver Code (Full Flow)
+```java
+public class LinkedInDemo {
+    public static void main(String[] args) {
+        LinkedInService service = new LinkedInService();
+
+        // 1. Register users + build profiles
+        LinkedInUser alice = service.registerUser("U1", "Alice", "alice@email.com");
+        alice.getProfile().addExperience(new Experience("SDE-2", "Microsoft",
+                LocalDate.of(2022, 1, 1), null));
+        alice.getProfile().addSkill("Java");
+        LinkedInUser bob = service.registerUser("U2", "Bob", "bob@email.com");
+
+        // 2. Connection flow
+        ConnectionRequest req = service.sendConnectionRequest("U1", "U2");
+        service.respondToRequest(req.getId(), true); // Bob accepts
+        // → Alice.connections now includes Bob (and vice versa)
+
+        // 3. Posts + engagement
+        Post post = service.createPost("U1", "Excited to join Microsoft!");
+        service.likePost("U2", post.getId());
+        service.commentOnPost("U2", post.getId(), "Congrats!");
+
+        // 4. Feed (posts from connections, reverse chronological)
+        List<Post> feed = service.getFeed("U2"); // sees Alice's post
+
+        // 5. Jobs
+        JobPosting job = service.postJob("Microsoft", "SDE-3",
+                "Backend role", List.of("Java", "Distributed Systems"));
+        service.applyToJob("U2", job.getId());
+        // → "Bob applied to SDE-3 at Microsoft"
+    }
+}
+```
+**Flow**: `sendConnectionRequest()` → create Connection(PENDING) → `respondToRequest(accept)` → `from.addConnection(to)` + `to.addConnection(from)` | `getFeed(userId)` → stream user's connections → flatMap their posts → sort by timestamp desc → limit(50) | `applyToJob()` → create JobApplication → add to job's applicant list
 
 ### 🎯 Interview Tips
 - **This is the most entity-rich problem**: User, Profile, Connection, Post, Comment, Job, Application, Message. Start with User → Profile, then expand.
@@ -1784,6 +2593,38 @@ public class LockerService {
 }
 ```
 
+### 🚀 Driver Code (Full Flow)
+```java
+public class AmazonLockerDemo {
+    public static void main(String[] args) {
+        LockerService service = new LockerService(new SizeMatchStrategy());
+
+        // 1. Setup locker location
+        List<Locker> lockers = List.of(
+                new Locker("L1", LockerSize.SMALL, "LOC-1"),
+                new Locker("L2", LockerSize.MEDIUM, "LOC-1"),
+                new Locker("L3", LockerSize.LARGE, "LOC-1"));
+        service.addLockerLocation("LOC-1", lockers);
+
+        // 2. Assign locker to package (small package → smallest fitting locker)
+        LockerPackage pkg = new LockerPackage("PKG-1", "ORD-100", LockerSize.SMALL);
+        String otp = service.assignLocker(pkg, "LOC-1");
+        // → "Package PKG-1 assigned to locker L1 | OTP: 482910"
+
+        // 3. Customer picks up with OTP
+        service.pickup("L1", otp);   // "Package picked up from locker L1"
+        // Locker L1 now AVAILABLE again
+
+        // 4. If not picked up in 3 days → expired (handled by scheduled task)
+        service.displayStatus("LOC-1");
+        // Locker L1 [SMALL] - AVAILABLE
+        // Locker L2 [MEDIUM] - AVAILABLE
+        // Locker L3 [LARGE] - AVAILABLE
+    }
+}
+```
+**Flow**: `assignLocker(pkg, locationId)` → `strategy.assign(lockers, pkgSize)` [finds smallest available locker that fits] → `locker.assignPackage(pkg)` → state: Available→Occupied → generate 6-digit OTP → schedule 3-day expiry timer → notify customer | `pickup(lockerId, otp)` → `locker.pickupPackage(otp)` → validate OTP → `locker.release()` → state: Occupied→Available
+
 ### 🎯 Interview Tips
 - **Size matching is the core algorithm**: Assign smallest locker that fits the package → minimize waste. Strategy pattern for different assignment policies.
 - **OTP security**: 6-digit random, expires in 3 days. After expiry → return to sender, locker freed.
@@ -1840,6 +2681,41 @@ public class TicketService {
     }
 }
 ```
+
+### 🚀 Driver Code (Full Flow)
+```java
+public class ConcertTicketDemo {
+    public static void main(String[] args) {
+        ConcertTicketService service = new ConcertTicketService(new DemandBasedPricing());
+
+        // 1. Setup event
+        Venue venue = new Venue("V1", "Madison Square", "NYC", 5000);
+        Event event = new Event("E1", "Coldplay Live", venue,
+                LocalDateTime.of(2026, 6, 15, 19, 0));
+        event.addSeats("VIP", createSeats(100, "VIP", 5000));    // 100 VIP seats @ ₹5000 base
+        event.addSeats("Regular", createSeats(400, "Regular", 1500)); // 400 regular
+        service.addEvent(event);
+
+        // 2. Hold seats (locked for 10 min)
+        User alice = new User("U1", "Alice", "alice@email.com");
+        ConcertBooking booking = service.holdSeats(alice, "E1", "VIP", 2);
+        // → 2 VIP seats held. Demand-based price: ₹5000×1.0 = ₹10000 total
+
+        // 3. Confirm + pay
+        service.confirmBooking(booking.getId(), new CardPayment("4111...1111"));
+        // → "Paid ₹10000 via Card. Booking confirmed."
+
+        // 4. If sold out → join waitlist
+        service.joinWaitlist("E1", "VIP", (evt, category) ->
+                System.out.println("VIP seat available! Book now."));
+
+        // 5. Cancel → refund + notify waitlist
+        double refund = service.cancelBooking(booking.getId());
+        // → "Cancelled. Refund: ₹8000" (80%). Waitlist notified.
+    }
+}
+```
+**Flow**: `holdSeats()` → `event.getAvailableSeats(category)` → `seat.hold()` [synchronized] → schedule 10-min auto-release → `pricingStrategy.calculatePrice()` [DemandBased checks remaining count] → create Booking(HELD) | `confirmBooking()` → pay → seat.book() | `cancelBooking()` → seat.release() → `waitlist.notifyNext()`
 
 ### 🎯 Interview Tips
 - **Similar to BookMyShow but with**: Dynamic pricing + waitlist. Two extra dimensions of complexity.
@@ -1905,6 +2781,44 @@ public class MatchingEngine {
 }
 ```
 
+### 🚀 Driver Code (Full Flow)
+```java
+public class StockExchangeDemo {
+    public static void main(String[] args) {
+        TradingService service = new TradingService();
+
+        // 1. Setup
+        Stock reliance = new Stock("RELIANCE", "Reliance Industries", 2500);
+        service.registerStock(reliance);
+        service.registerUser("alice");
+        service.registerUser("bob");
+
+        // 2. Alice places BUY order: 10 shares @ ₹2500
+        service.placeOrder("alice", "RELIANCE", OrderSide.BUY,
+                OrderType.LIMIT, 2500, 10);
+        // → Added to buy heap. No sell orders yet → no match.
+
+        // 3. Bob places SELL order: 5 shares @ ₹2480
+        service.placeOrder("bob", "RELIANCE", OrderSide.SELL,
+                OrderType.LIMIT, 2480, 5);
+        // → Match! buyPrice(2500) >= sellPrice(2480)
+        // → Trade: RELIANCE 5 @ ₹2480 [alice ← bob]
+        // → Alice's order partially filled: 5/10 remaining
+
+        // 4. Charlie sells 5 more @ ₹2490
+        service.registerUser("charlie");
+        service.placeOrder("charlie", "RELIANCE", OrderSide.SELL,
+                OrderType.LIMIT, 2490, 5);
+        // → Match! 2500 >= 2490 → Trade: 5 @ ₹2490. Alice fully filled.
+
+        // 5. Show portfolio
+        service.showPortfolio("alice");
+        // → RELIANCE: 10 shares (LTP: ₹2490)
+    }
+}
+```
+**Flow**: `placeOrder()` → create StockOrder → `orderBook.addOrder(order)` [buy→MaxHeap, sell→MinHeap] → `matchingEngine.match(book)` → while bestBuy.price >= bestSell.price: `Trade(buy, sell, sellPrice, min(buyQty, sellQty))` → fill orders (partial or full) → update LTP → update portfolios → notify observers
+
 ### 🎯 Interview Tips
 - **Order Book is the heart**: Per stock: buy orders in MaxHeap (highest price first), sell orders in MinHeap (lowest price first). Match when `bestBuy >= bestSell`.
 - **Price-Time Priority**: Same price → earlier order gets matched first. Use `Comparable` with price + timestamp.
@@ -1967,6 +2881,61 @@ public class TaskService {
     }
 }
 ```
+
+### 🚀 Driver Code (Full Flow)
+```java
+public class JiraDemo {
+    public static void main(String[] args) {
+        TaskManagementService service = new TaskManagementService();
+
+        // 1. Setup
+        TaskUser alice = service.registerUser("U1", "Alice", "alice@email.com");
+        TaskUser bob = service.registerUser("U2", "Bob", "bob@email.com");
+        Project project = service.createProject("Payment Service");
+
+        // 2. Create sprint
+        Sprint sprint = service.createSprint(project.getId(), "Sprint 1",
+                LocalDate.of(2026, 3, 20), LocalDate.of(2026, 4, 3));
+
+        // 3. Create tasks
+        TaskItem task1 = service.createTask(project.getId(), "Implement Stripe API",
+                TaskType.STORY, "U1");
+        TaskItem task2 = service.createTask(project.getId(), "Fix payment timeout",
+                TaskType.BUG, "U1");
+
+        // 4. Assign + add to sprint
+        service.assignTask(task1.getId(), "U1"); // assigned to Alice
+        service.assignTask(task2.getId(), "U2"); // assigned to Bob
+        service.addTaskToSprint(sprint.getId(), task1.getId(), project.getId());
+        service.addTaskToSprint(sprint.getId(), task2.getId(), project.getId());
+
+        // 5. Add dependency: task2 blocked by task1
+        service.addDependency(task2.getId(), task1.getId());
+
+        // 6. State transitions
+        service.moveTaskForward(task1.getId()); // TODO → IN_PROGRESS
+        service.moveTaskForward(task2.getId()); // BLOCKED! "task2 blocked by unfinished dependencies"
+        service.moveTaskForward(task1.getId()); // IN_PROGRESS → IN_REVIEW
+        service.moveTaskForward(task1.getId()); // IN_REVIEW → DONE
+        service.moveTaskForward(task2.getId()); // NOW works: TODO → IN_PROGRESS
+
+        // 7. Sprint board
+        service.showSprintBoard(sprint.getId(), project.getId());
+        // ═══ Sprint Board: Sprint 1 ═══
+        // ── DONE ──
+        //   [STORY] Implement Stripe API → Alice
+        // ── IN_PROGRESS ──
+        //   [BUG] Fix payment timeout → Bob
+
+        // 8. Activity log
+        service.showActivityLog(task1.getId());
+        // [10:00] status changed status: TODO → IN_PROGRESS (by Alice)
+        // [10:05] status changed status: IN_PROGRESS → IN_REVIEW (by Alice)
+        // [10:10] status changed status: IN_REVIEW → DONE (by Alice)
+    }
+}
+```
+**Flow**: `createTask()` → Task(TodoState) → `assignTask()` → sets assignee + logs activity | `moveTaskForward()` → check dependencies (all DONE?) → `state.moveForward(task)` → TodoState creates InProgressState → logs ActivityLog(old, new) → notify assignee | `showSprintBoard()` → group sprint tasks by state → display kanban columns
 
 ### 🎯 Interview Tips
 - **State pattern enforces valid transitions**: Each state knows what transitions are allowed. `TodoState.moveForward()` → InProgressState only. Cannot jump to DoneState.
