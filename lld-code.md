@@ -1,6 +1,55 @@
 # LLD Handbook — Full Java Implementations (30 Problems)
 
-> Each problem follows: **Functional Requirements → Entities → Class Diagram → Java Code (with Pattern) → Service Layer**
+> Each problem: **Functional Requirements → Entities → Class Diagram → Full Java Code → Service Layer → Driver Code (main)**
+
+---
+
+# 📑 Index (Click to Navigate)
+
+### 🟢 Easy (1-7)
+| # | Problem | Jump |
+|---|---------|------|
+| 1 | Parking Lot | [→ Go](#1--parking-lot-system-) |
+| 2 | Logger System | [→ Go](#2--logger-system-) |
+| 3 | Vending Machine | [→ Go](#3--vending-machine-) |
+| 4 | Stack Overflow (Q&A) | [→ Go](#4--stack-overflow-qa-platform-) |
+| 5 | Library Management | [→ Go](#5--library-management-system-) |
+| 6 | Tic-Tac-Toe | [→ Go](#6--tic-tac-toe-) |
+| 7 | Traffic Signal | [→ Go](#7--traffic-signal-system-) |
+
+### 🟡 Medium (8-23)
+| # | Problem | Jump |
+|---|---------|------|
+| 8 | Elevator System | [→ Go](#8--elevator-system-) |
+| 9 | In-Memory KV Store | [→ Go](#9--in-memory-key-value-store-) |
+| 10 | LRU Cache | [→ Go](#10--lru-cache-) |
+| 11 | BookMyShow | [→ Go](#11--movie-ticket-booking-bookmyshow-) |
+| 12 | Chess Game | [→ Go](#12--chess-game-) |
+| 13 | Snake & Ladder | [→ Go](#13--snake--ladder-) |
+| 14 | ATM Machine | [→ Go](#14--atm-machine-) |
+| 15 | Shopping Cart | [→ Go](#15--online-shopping-cart-) |
+| 16 | Food Delivery | [→ Go](#16--food-delivery-swiggyzomato-) |
+| 17 | Hotel Booking | [→ Go](#17--hotel-booking-system-) |
+| 18 | In-Memory File System | [→ Go](#18--in-memory-file-system-) |
+| 19 | Notification Service | [→ Go](#19--notification-service-) |
+| 20 | Chat Application | [→ Go](#20--chat-application-) |
+| 21 | Job Scheduler | [→ Go](#21--in-memory-job-scheduler-) |
+| 22 | Rate Limiter | [→ Go](#22--rate-limiter-) |
+| 23 | Splitwise | [→ Go](#23--splitwise-expense-sharing-) |
+
+### 🔴 Hard (24-30)
+| # | Problem | Jump |
+|---|---------|------|
+| 24 | Ride Sharing (Uber) | [→ Go](#24--ride-sharing-uberola-) |
+| 25 | Cricket Scorecard | [→ Go](#25--cricket-scorecard-cricinfo-) |
+| 26 | LinkedIn | [→ Go](#26--linkedin-) |
+| 27 | Amazon Locker | [→ Go](#27--amazon-locker-system-) |
+| 28 | Concert Tickets | [→ Go](#28--concert-ticket-system-) |
+| 29 | Stock Exchange | [→ Go](#29--stock-exchange--trading-system-) |
+| 30 | Task Management (Jira) | [→ Go](#30--task-management-system-jira-like-) |
+
+### Reference
+- [Pattern Cheat Sheet](#pattern-cheat-sheet) · [Imports Reference](#imports-reference)
 
 ---
 
@@ -268,6 +317,41 @@ public class ParkingService {
 }
 ```
 
+### 1.6 Driver Code (main)
+```java
+public class ParkingLotDemo {
+    public static void main(String[] args) {
+        // 1. Setup parking lot
+        ParkingLot lot = ParkingLot.getInstance();
+        lot.setFeeStrategy(new HourlyFeeStrategy());
+
+        List<ParkingSpot> floor1Spots = new ArrayList<>();
+        for (int i = 1; i <= 5; i++) floor1Spots.add(new ParkingSpot("F1-C" + i, SpotType.COMPACT));
+        for (int i = 1; i <= 3; i++) floor1Spots.add(new ParkingSpot("F1-L" + i, SpotType.LARGE));
+        lot.addFloor(new Floor(1, floor1Spots));
+
+        ParkingService service = new ParkingService();
+
+        // 2. Park vehicles
+        Vehicle car = new Car("KA-01-1234");
+        Ticket ticket = service.entry(car);
+        // → "Vehicle KA-01-1234 parked at spot F1-C1"
+
+        Vehicle truck = new Truck("KA-02-5678");
+        Ticket ticket2 = service.entry(truck);
+        // → "Vehicle KA-02-5678 parked at spot F1-L1"
+
+        // 3. Display availability
+        service.showAvailability();
+        // Floor 1: COMPACT: 4 available, LARGE: 2 available
+
+        // 4. Exit and pay
+        double fee = service.exit(ticket.getTicketId());
+        // → "Fee for ticket xxx: ₹20.0"
+    }
+}
+```
+
 ---
 
 ## 2 · Logger System 🟢
@@ -443,6 +527,33 @@ public class LoggingService {
     // Usage from any service
     // loggingService.logInfo("User logged in");
     // loggingService.logError("Database connection failed");
+}
+```
+
+### 2.6 Driver Code (main)
+```java
+public class LoggerDemo {
+    public static void main(String[] args) {
+        // 1. Build handler chain: DEBUG(console) → ERROR(file)
+        LogHandler consoleHandler = new ConsoleHandler(LogLevel.DEBUG);
+        LogHandler fileHandler = new FileHandler(LogLevel.ERROR, "/var/log/app.log");
+        consoleHandler.setNext(fileHandler);
+
+        // 2. Setup singleton logger
+        Logger logger = Logger.getInstance();
+        logger.setHandlerChain(consoleHandler);
+
+        // 3. Log messages — chain decides who handles
+        logger.info("Server started on port 8080");
+        // CONSOLE: [2026-03-20T10:00] [INFO] Server started on port 8080
+
+        logger.error("Database connection failed");
+        // CONSOLE: [2026-03-20T10:00] [ERROR] Database connection failed
+        // FILE [/var/log/app.log]: [2026-03-20T10:00] [ERROR] Database connection failed
+
+        logger.debug("Cache hit ratio: 92%");
+        // CONSOLE: [2026-03-20T10:00] [DEBUG] Cache hit ratio: 92%
+    }
 }
 ```
 
@@ -715,6 +826,34 @@ public class VendingMachineService {
 }
 ```
 
+### 3.6 Driver Code (main)
+```java
+public class VendingMachineDemo {
+    public static void main(String[] args) {
+        VendingMachineService service = new VendingMachineService();
+        service.setupProducts();
+
+        // Happy path: purchase with enough money
+        service.purchaseProduct(50, "A1");
+        // "Money inserted: ₹50"
+        // "Dispensed: Coke"
+        // "Returning change: ₹10"
+
+        // Insufficient money
+        service.purchaseProduct(10, "A1");
+        // "Money inserted: ₹10"
+        // "Insufficient balance. Need ₹30 more"
+        service.cancelAndRefund();
+        // "Returning ₹10"
+
+        // Out of stock (after buying all 5 Cokes)
+        for (int i = 0; i < 4; i++) service.purchaseProduct(40, "A1");
+        service.purchaseProduct(40, "A1");
+        // "Product out of stock"
+    }
+}
+```
+
 ---
 
 ## 4 · Stack Overflow (Q&A Platform) 🟢
@@ -967,6 +1106,36 @@ public class QnAService {
         return questions.values().stream()
                 .filter(q -> q.getTags().contains(tag))
                 .collect(Collectors.toList());
+    }
+}
+```
+
+### 4.6 Driver Code (main)
+```java
+public class StackOverflowDemo {
+    public static void main(String[] args) {
+        QnAService service = new QnAService();
+
+        // 1. Register users
+        User alice = service.registerUser("u1", "Alice", "alice@email.com");
+        User bob = service.registerUser("u2", "Bob", "bob@email.com");
+
+        // 2. Alice posts question (auto-subscribes as observer)
+        Question q = service.postQuestion("u1", "How does HashMap work?",
+                "Explain internal implementation", List.of("java", "collections"));
+
+        // 3. Bob answers → Alice gets notified
+        Answer a = service.postAnswer("u2", q.getId(), "It uses array of linked lists...");
+        // "Notification to Alice: New answer on 'How does HashMap work?' by Bob"
+
+        // 4. Upvote + accept
+        service.upvoteAnswer(q.getId(), a.getId(), "u1");  // Bob: rep 0 → 10
+        service.acceptAnswer(q.getId(), a.getId());         // Bob: rep 10 → 25
+        System.out.println("Bob's reputation: " + bob.getReputation()); // 25
+
+        // 5. Search by tag
+        List<Question> javaQs = service.searchByTag("java");
+        System.out.println("Java questions: " + javaQs.size()); // 1
     }
 }
 ```
@@ -1238,6 +1407,38 @@ public class LibraryService {
 }
 ```
 
+### 5.6 Driver Code (main)
+```java
+public class LibraryDemo {
+    public static void main(String[] args) {
+        LibraryService lib = new LibraryService();
+
+        // 1. Setup
+        Book java = new Book("ISBN-001", "Effective Java", "Bloch", "Programming");
+        lib.addBook(java, 2);  // 2 copies
+        lib.registerMember(new Member("M1", "Alice"));
+        lib.registerMember(new Member("M2", "Bob"));
+        lib.registerMember(new Member("M3", "Charlie"));
+
+        // 2. Alice borrows copy 1
+        Loan loan1 = lib.borrowBook("M1", "ISBN-001");
+        // "Alice borrowed 'Effective Java'"
+
+        // 3. Bob borrows copy 2
+        Loan loan2 = lib.borrowBook("M2", "ISBN-001");
+
+        // 4. Charlie tries — no copies → reservation
+        lib.borrowBook("M3", "ISBN-001");
+        // "All copies lent. Reservation created for Charlie"
+
+        // 5. Alice returns → fine if overdue + Charlie auto-fulfilled
+        Fine fine = lib.returnBook(loan1.getLoanId());
+        if (fine != null) System.out.println("Fine: ₹" + fine.getAmount());
+        // "Reservation fulfilled for Charlie"
+    }
+}
+```
+
 ---
 
 ## 6 · Tic-Tac-Toe 🟢
@@ -1435,6 +1636,25 @@ public class TicTacToeService {
 }
 ```
 
+### 6.6 Driver Code (main)
+```java
+public class TicTacToeDemo {
+    public static void main(String[] args) {
+        TicTacToeService service = new TicTacToeService();
+        service.startGame("Alice", "Bob");
+
+        service.playTurn(0, 0); // Alice: X at (0,0)
+        service.playTurn(1, 1); // Bob:   O at (1,1)
+        service.playTurn(0, 1); // Alice: X at (0,1)
+        service.playTurn(2, 2); // Bob:   O at (2,2)
+        service.playTurn(0, 2); // Alice: X at (0,2) → top row complete!
+        // "Alice wins!"
+
+        System.out.println(service.getResult());
+    }
+}
+```
+
 ---
 
 ## 7 · Traffic Signal System 🟢
@@ -1574,6 +1794,31 @@ public class TrafficSignalService {
             System.out.println("  " + signal.getRoad().getName() +
                     ": " + signal.getCurrentState().getColor());
         }
+    }
+}
+```
+
+### 7.6 Driver Code (main)
+```java
+public class TrafficSignalDemo {
+    public static void main(String[] args) {
+        Intersection intersection = new Intersection("Main St & 5th Ave");
+        intersection.addSignal(new TrafficSignal(new Road("Main St"), new GreenState(30)));
+        intersection.addSignal(new TrafficSignal(new Road("5th Ave"), new RedState(30)));
+
+        TrafficSignalService controller = new TrafficSignalService(intersection);
+
+        controller.displayStatus();
+        // Main St: GREEN, 5th Ave: RED
+
+        controller.startCycle();  // transitions all signals
+        controller.displayStatus();
+        // Main St: YELLOW, 5th Ave: GREEN
+
+        // Emergency override
+        controller.emergencyOverride("5th Ave");
+        // 5th Ave: GREEN(60s), Main St: RED(60s)
+        controller.displayStatus();
     }
 }
 ```
@@ -1793,6 +2038,33 @@ public class ElevatorService {
 }
 ```
 
+### 8.6 Driver Code (main)
+```java
+public class ElevatorDemo {
+    public static void main(String[] args) {
+        Building building = new Building(10, 3, new NearestElevatorScheduler());
+        ElevatorService service = new ElevatorService(building);
+
+        // User on floor 3 wants floor 7
+        service.requestElevator(3, 7);
+        // "Elevator 0 assigned for floor 3 → 7"
+
+        // Another user: floor 5 → floor 1
+        service.requestElevator(5, 1);
+
+        // Step through movements
+        service.step(); // Elevator 0 moves to floor 3
+        service.step(); // Elevator 0 moves to floor 7
+        service.step(); // Elevator 1 moves to floor 5
+
+        service.displayStatus();
+        // Elevator 0: Floor 7 | IDLE
+        // Elevator 1: Floor 5 | DOWN
+        // Elevator 2: Floor 0 | IDLE
+    }
+}
+```
+
 ---
 
 ## 9 · In-Memory Key-Value Store 🟡
@@ -1942,6 +2214,31 @@ public class KVStoreService {
 
     public Map<String, String> takeSnapshot() {
         return store.snapshot();
+    }
+}
+```
+
+### 9.6 Driver Code (main)
+```java
+public class KVStoreDemo {
+    public static void main(String[] args) throws InterruptedException {
+        KVStoreService service = new KVStoreService();
+
+        // Basic CRUD
+        service.set("user:1", "Alice");
+        service.set("user:2", "Bob");
+        System.out.println(service.get("user:1")); // "Alice"
+        service.delete("user:2");
+
+        // TTL: key expires after 2 seconds
+        service.setWithTTL("session:abc", "token-xyz", 2000);
+        System.out.println(service.get("session:abc")); // "token-xyz"
+        Thread.sleep(3000);
+        System.out.println(service.get("session:abc")); // null (expired)
+
+        // Snapshot
+        Map<String, String> snap = service.takeSnapshot();
+        System.out.println("Snapshot: " + snap); // {user:1=Alice}
     }
 }
 ```
@@ -2107,6 +2404,31 @@ public class CacheService {
         Object user = "User_" + userId; // would be a real DB call
         cache.put("user:" + userId, user);
         return user;
+    }
+}
+```
+
+### 10.6 Driver Code (main)
+```java
+public class LRUCacheDemo {
+    public static void main(String[] args) {
+        LRUCache<String, String> cache = new LRUCache<>(3);
+
+        cache.put("a", "1");  // DLL: [a]
+        cache.put("b", "2");  // DLL: [b, a]
+        cache.put("c", "3");  // DLL: [c, b, a]
+
+        cache.get("a");       // access "a" → DLL: [a, c, b]
+
+        cache.put("d", "4");  // full → evicts LRU "b" → DLL: [d, a, c]
+
+        System.out.println(cache.get("b")); // null (evicted)
+        System.out.println(cache.get("a")); // "1" (still here)
+        System.out.println(cache.get("c")); // "3" (still here)
+
+        // Update existing
+        cache.put("c", "33"); // DLL: [c, a, d]
+        System.out.println(cache.get("c")); // "33"
     }
 }
 ```
@@ -2389,6 +2711,34 @@ public class BookingService {
                 .filter(t -> t.getCity().equalsIgnoreCase(city))
                 .flatMap(t -> t.getShowsForMovie(movieId).stream())
                 .collect(Collectors.toList());
+    }
+}
+```
+
+### 11.6 Driver Code (main)
+```java
+public class BookMyShowDemo {
+    public static void main(String[] args) {
+        BookingService service = new BookingService();
+
+        Movie movie = new Movie("M1", "Inception", "Sci-Fi", 148);
+        List<Seat> seats = new ArrayList<>();
+        for (int i = 1; i <= 50; i++) seats.add(new Seat("S" + i, SeatType.REGULAR, "A", i, 200));
+        Screen screen = new Screen("SC1", seats);
+        Show show = new Show("SH1", movie, screen, LocalDateTime.of(2026, 3, 20, 18, 0));
+
+        User user = new User("U1", "Alice", "alice@email.com");
+        List<Seat> selected = show.getAvailableSeats().subList(0, 2);
+
+        // Lock seats (5 min hold)
+        Booking booking = service.initiateBooking(user, show, selected);
+
+        // Confirm with payment
+        service.confirmBooking(booking.getId(), new UPIPayment("alice@upi"));
+        // → "Paid ₹400 via UPI. Booking confirmed."
+
+        // Cancel another booking
+        // service.cancelBooking(bookingId); // releases seats
     }
 }
 ```
@@ -2712,6 +3062,27 @@ public class ChessGameService {
 }
 ```
 
+### 12.6 Driver Code (main)
+```java
+public class ChessDemo {
+    public static void main(String[] args) {
+        ChessGameService service = new ChessGameService();
+        service.startGame("Alice", "Bob");
+
+        // White (Alice) opens: Knight from (7,1) to (5,2)
+        service.playMove(7, 1, 5, 2);
+        // Black (Bob): Pawn from (1,4) to (3,4)
+        service.playMove(1, 4, 3, 4);
+        // White: Bishop from (7,2) to (4,5)
+        service.playMove(7, 2, 4, 5);
+
+        // Invalid move attempt
+        boolean valid = service.playMove(0, 0, 5, 5); // Rook can't go diagonal
+        System.out.println("Valid move: " + valid); // false
+    }
+}
+```
+
 ---
 
 ## 13 · Snake & Ladder 🟡
@@ -2878,6 +3249,22 @@ public class SnakeLadderService {
         game.play();
 
         System.out.println("Winner: " + game.getWinner().getName());
+    }
+}
+```
+
+### 13.6 Driver Code (main)
+```java
+public class SnakeLadderDemo {
+    public static void main(String[] args) {
+        SnakeLadderService service = new SnakeLadderService();
+        service.startGame();
+        // Output:
+        // Alice rolled 4 | 0 → 4
+        // Bob rolled 2 | 0 → 2  "Climbed ladder! From 2 to 38"
+        // Alice rolled 6 | 4 → 10
+        // ... continues until someone reaches 100
+        // "Alice WINS!"
     }
 }
 ```
@@ -3170,6 +3557,30 @@ public class ATMService {
 }
 ```
 
+### 14.6 Driver Code (main)
+```java
+public class ATMDemo {
+    public static void main(String[] args) {
+        ATMService service = new ATMService();
+        Card card = new Card("CARD-001", "ACC001");
+
+        // Withdrawal: ₹1700 → 3x500 + 1x200
+        service.performWithdrawal(card, "1234", 1700);
+        // "Card inserted." "PIN verified."
+        // "Withdrawing ₹1700" "3 x ₹500" "1 x ₹200"
+        // "Remaining balance: ₹48300" "Card ejected."
+
+        // Wrong PIN
+        service.performWithdrawal(card, "0000", 500);
+        // "Card inserted." "Invalid PIN." "Card ejected."
+
+        // Check balance
+        service.checkBalance(card, "1234");
+        // "Balance: ₹48300"
+    }
+}
+```
+
 ---
 
 ## 15 · Online Shopping Cart 🟡
@@ -3412,6 +3823,31 @@ public class ShoppingService {
 }
 ```
 
+### 15.6 Driver Code (main)
+```java
+public class ShoppingCartDemo {
+    public static void main(String[] args) {
+        ShoppingService shop = new ShoppingService();
+        shop.addToCatalog(new Product("P1", "Laptop", 50000, "Electronics"));
+        shop.addToCatalog(new Product("P2", "Mouse", 500, "Electronics"));
+        shop.addCoupon(new Coupon("SAVE10", 10.0, LocalDate.of(2026, 12, 31)));
+
+        // Add to cart
+        shop.addToCart("user1", "P1", 1);
+        shop.addToCart("user1", "P2", 2);
+
+        // Checkout with coupon + UPI
+        Order order = shop.checkout("user1", new UPIPayment("user@upi"), "SAVE10");
+        // "Coupon applied. New total: ₹45900"
+        // "Paid ₹45900 via UPI"
+        // "Order placed: ORD-xxx"
+
+        // Track status
+        shop.updateOrderStatus(order.getId(), OrderStatus.SHIPPED);
+    }
+}
+```
+
 ---
 
 ## 16 · Food Delivery (Swiggy/Zomato) 🟡
@@ -3635,6 +4071,33 @@ public class FoodDeliveryService {
 }
 ```
 
+### 16.6 Driver Code (main)
+```java
+public class FoodDeliveryDemo {
+    public static void main(String[] args) {
+        FoodDeliveryService service = new FoodDeliveryService(new NearestAgentStrategy());
+
+        Restaurant r = new Restaurant("R1", "Pizza Palace", new Location(12.9, 77.6));
+        r.addMenuItem(new MenuItem("M1", "Margherita", 250));
+        r.addMenuItem(new MenuItem("M2", "Garlic Bread", 150));
+        service.registerRestaurant(r);
+        service.registerAgent(new DeliveryAgent("A1", "Ravi", new Location(12.91, 77.61)));
+
+        User user = new User("U1", "Alice", "alice@email.com");
+        FoodOrder order = service.placeOrder(user, "R1", List.of("M1", "M2"),
+                new UPIPayment("user@upi"));
+        // → "Paid ₹400. Agent Ravi assigned."
+
+        service.updateOrderStatus(order.getId(), FoodOrderStatus.PREPARING);
+        service.updateOrderStatus(order.getId(), FoodOrderStatus.PICKED_UP);
+        service.updateOrderStatus(order.getId(), FoodOrderStatus.DELIVERED);
+        // Agent Ravi now available again
+
+        service.rateAgent(order.getId(), 4.5);
+    }
+}
+```
+
 ---
 
 ## 17 · Hotel Booking System 🟡
@@ -3832,6 +4295,35 @@ public class HotelBookingService {
         double refund = booking.getTotalAmount() * 0.5;
         System.out.println("Booking cancelled. Refund: ₹" + refund);
         return refund;
+    }
+}
+```
+
+### 17.6 Driver Code (main)
+```java
+public class HotelBookingDemo {
+    public static void main(String[] args) {
+        HotelBookingService service = new HotelBookingService(new StandardPricing());
+
+        Hotel hotel = new Hotel("H1", "Grand Hyatt", "Mumbai");
+        hotel.addRoom(new Room("R101", RoomType.DOUBLE, 5000));
+        hotel.addRoom(new Room("R102", RoomType.SUITE, 12000));
+        service.registerHotel(hotel);
+
+        // Search
+        List<Room> rooms = service.searchRooms("Mumbai", RoomType.DOUBLE,
+                LocalDate.of(2026, 4, 10), LocalDate.of(2026, 4, 12));
+
+        // Book
+        Guest guest = new Guest("G1", "Alice", "alice@email.com");
+        HotelBooking booking = service.bookRoom(guest, rooms.get(0),
+                LocalDate.of(2026, 4, 10), LocalDate.of(2026, 4, 12),
+                new CardPayment("4111111111111111"));
+        // → "Paid ₹10000. Booking confirmed."
+
+        // Cancel → 50% refund
+        double refund = service.cancelBooking(booking.getId());
+        // → "Refund: ₹5000"
     }
 }
 ```
@@ -4083,6 +4575,31 @@ public class FileSystemService {
 }
 ```
 
+### 18.6 Driver Code (main)
+```java
+public class FileSystemDemo {
+    public static void main(String[] args) {
+        FileSystemService fs = new FileSystemService();
+
+        fs.createDirectory("home");
+        fs.navigate("home");
+        fs.createDirectory("docs");
+        fs.createFile("readme.txt", "Hello World!");
+
+        fs.listContents();
+        // Contents of /home: docs/, readme.txt
+
+        System.out.println(fs.readFile("readme.txt")); // "Hello World!"
+
+        List<String> found = fs.search("readme.txt");
+        System.out.println("Found: " + found); // ["/home/readme.txt"]
+
+        fs.navigate("..");
+        fs.delete("home"); // recursive delete
+    }
+}
+```
+
 ---
 
 ## 19 · Notification Service 🟡
@@ -4277,6 +4794,28 @@ public class NotificationService {
             Notification n = retryQueue.poll();
             dispatch(n);
         }
+    }
+}
+```
+
+### 19.6 Driver Code (main)
+```java
+public class NotificationDemo {
+    public static void main(String[] args) {
+        NotificationService service = new NotificationService();
+
+        service.registerTemplate(new Template("T1", "OrderUpdate",
+                "Hi {name}, your order {orderId} is {status}"));
+        service.setUserPreference(new UserPreference("U1",
+                List.of(ChannelType.EMAIL, ChannelType.PUSH)));
+
+        service.send("U1", "T1",
+                Map.of("name", "Alice", "orderId", "ORD-123", "status", "shipped"),
+                Priority.HIGH);
+        // EMAIL → [HIGH] Hi Alice, your order ORD-123 is shipped
+        // PUSH  → [HIGH] Hi Alice, your order ORD-123 is shipped
+
+        service.processRetryQueue();
     }
 }
 ```
@@ -4498,6 +5037,37 @@ public class ChatService {
 
     public List<Message> getHistory(String conversationId) {
         return conversations.get(conversationId).getMessageHistory();
+    }
+}
+```
+
+### 20.6 Driver Code (main)
+```java
+public class ChatAppDemo {
+    public static void main(String[] args) {
+        ChatService chat = new ChatService();
+
+        ChatUser alice = chat.registerUser("U1", "Alice");
+        ChatUser bob = chat.registerUser("U2", "Bob");
+        ChatUser charlie = chat.registerUser("U3", "Charlie");
+        alice.goOnline(); bob.goOnline(); charlie.goOnline();
+
+        // 1-to-1 DM
+        Conversation dm = chat.startOneToOne("U1", "U2");
+        chat.sendMessage("U1", dm.getId(), "Hey Bob!", MessageType.TEXT);
+        // [Bob] received: Hey Bob! (from Alice)
+
+        // Group chat
+        GroupConversation group = chat.createGroup("Weekend Plans", "U1");
+        chat.addToGroup(group.getId(), "U2");
+        chat.addToGroup(group.getId(), "U3");
+        chat.sendMessage("U1", group.getId(), "Hiking Saturday?", MessageType.TEXT);
+        // [Bob] received: Hiking Saturday? (from Alice)
+        // [Charlie] received: Hiking Saturday? (from Alice)
+
+        // History
+        List<Message> history = chat.getHistory(dm.getId());
+        System.out.println("DM messages: " + history.size()); // 1
     }
 }
 ```
