@@ -68,7 +68,12 @@
 5. Display available spots per floor/type
 
 ### 1.2 Entities
-`ParkingLot` · `Floor` · `ParkingSpot` · `Vehicle` · `Ticket` · `FeeStrategy`
+- `ParkingLot` — singleton, manages floors and active tickets
+- `Floor` — holds parking spots, finds available ones
+- `ParkingSpot` — tracks occupancy, checks vehicle compatibility
+- `Vehicle` — abstract (Car/Truck/Motorcycle), carries license plate + type
+- `Ticket` — records vehicle, spot, entry/exit time
+- `FeeStrategy` — interface for fee calculation (hourly, flat)
 
 ### 1.3 Class Diagram
 ```
@@ -365,7 +370,10 @@ public class ParkingLotDemo {
 5. Thread-safe logging
 
 ### 2.2 Entities
-`Logger` · `LogLevel` · `LogHandler` · `LogMessage`
+- `Logger` — singleton, entry point for all log calls
+- `LogLevel` — enum (DEBUG→FATAL) with severity ranking
+- `LogHandler` — abstract chain node, processes or forwards messages
+- `LogMessage` — holds level, message, timestamp
 
 ### 2.3 Class Diagram
 ```
@@ -570,7 +578,10 @@ public class LoggerDemo {
 5. Admin can refill products
 
 ### 3.2 Entities
-`VendingMachine` · `Product` · `Inventory` · `State`
+- `VendingMachine` — holds state, inventory, balance; delegates to current state
+- `Product` — code, name, price
+- `Inventory` — maps product codes to quantities
+- `VendingState` — interface for state-dependent behavior (Idle/HasMoney/Dispensing/ReturnChange)
 
 ### 3.3 Class Diagram
 ```
@@ -867,7 +878,12 @@ public class VendingMachineDemo {
 5. Comment on questions and answers
 
 ### 4.2 Entities
-`User` · `Question` · `Answer` · `Comment` · `Tag` · `Vote` · `VoteType`
+- `User` — posts questions/answers, earns reputation, observes questions
+- `Question` — observable; holds title, body, tags, answers, votes
+- `Answer` — votable; can be accepted by question author
+- `Comment` — text attached to question or answer
+- `Vote` — UP or DOWN, linked to a user
+- `Votable` — interface shared by Question and Answer
 
 ### 4.3 Class Diagram
 ```
@@ -1153,7 +1169,12 @@ public class StackOverflowDemo {
 5. Reservation if all copies are lent out
 
 ### 5.2 Entities
-`Library` · `Book` · `BookItem` · `Member` · `Loan` · `Reservation` · `Fine`
+- `Book` — metadata (ISBN, title, author, subject)
+- `BookItem` — physical copy with barcode, tracks availability + due date
+- `Member` — borrower with max 5 active loans
+- `Loan` — links BookItem to Member with issue/due/return dates
+- `Reservation` — queued request when all copies are lent out
+- `Fine` — calculated from overdue days × rate
 
 ### 5.3 Class Diagram
 ```
@@ -1451,7 +1472,11 @@ public class LibraryDemo {
 4. Support replaying
 
 ### 6.2 Entities
-`Game` · `Board` · `Player` · `Cell` · `Piece`
+- `Game` — manages board, players, turn order, win/draw detection
+- `Board` — NxN grid, handles placement and win checking
+- `Player` — name + assigned piece (X or O)
+- `Piece` — enum (X, O)
+- `GameStatus` — enum (IN_PROGRESS, WIN, DRAW)
 
 ### 6.3 Class Diagram
 ```
@@ -1667,7 +1692,11 @@ public class TicTacToeDemo {
 4. Emergency override to force green on one road
 
 ### 7.2 Entities
-`Intersection` · `Road` · `TrafficSignal` · `SignalState` · `SignalController`
+- `Intersection` — groups multiple traffic signals
+- `Road` — named road at the intersection
+- `TrafficSignal` — links a road to its current state, supports transitions
+- `SignalState` — interface (Green/Yellow/Red); knows next state + duration
+- `TrafficSignalService` — orchestrates cycle + emergency override
 
 ### 7.3 Class Diagram
 ```
@@ -1840,7 +1869,11 @@ public class TrafficSignalDemo {
 5. Direction-aware: serve requests in current direction first (SCAN)
 
 ### 8.2 Entities
-`Building` · `Elevator` · `Request` · `Scheduler` · `ElevatorState` · `Direction`
+- `Building` — holds N elevators + scheduling strategy
+- `Elevator` — tracks floor, direction, stops (TreeSets); notifies observers
+- `Request` — source floor + destination floor + direction
+- `ElevatorScheduler` — strategy interface to pick which elevator serves a request
+- `ElevatorObserver` — notified on floor changes (e.g., FloorDisplay)
 
 ### 8.3 Class Diagram
 ```
@@ -2077,7 +2110,9 @@ public class ElevatorDemo {
 4. Snapshot support for persistence
 
 ### 9.2 Entities
-`KVStore` · `Entry` · `ExpiryManager`
+- `KVStore` — singleton, thread-safe ConcurrentHashMap-based store
+- `Entry` — key, value, createdAt, TTL; knows if it's expired
+- `ExpiryManager` — ScheduledExecutorService that evicts expired keys periodically
 
 ### 9.3 Class Diagram
 ```
@@ -2255,7 +2290,9 @@ public class KVStoreDemo {
 4. O(1) for both GET and PUT
 
 ### 10.2 Entities
-`LRUCache` · `DoublyLinkedList` · `Node`
+- `LRUCache<K,V>` — fixed-capacity cache, O(1) get/put via HashMap + DLL
+- `DoublyLinkedList<K,V>` — maintains access order; dummy head/tail for clean ops
+- `Node<K,V>` — holds key, value, prev, next pointers
 
 ### 10.3 Class Diagram
 ```
@@ -2446,7 +2483,13 @@ public class LRUCacheDemo {
 5. Notification on booking confirmation
 
 ### 11.2 Entities
-`Movie` · `Theatre` · `Screen` · `Show` · `Seat` · `Booking` · `Payment` · `User`
+- `Movie` — id, title, genre, duration
+- `Theatre` — name, city, screens, shows
+- `Screen` — list of physical seats
+- `Show` — links movie + screen + time; holds seat status map (synchronized locking)
+- `Seat` — id, type (Regular/Premium/VIP), row, number, price
+- `Booking` — user + show + selected seats + status (PENDING/CONFIRMED/CANCELLED)
+- `PaymentStrategy` — interface (Card/UPI); processes payment amount
 
 ### 11.3 Class Diagram
 ```
@@ -2756,7 +2799,12 @@ public class BookMyShowDemo {
 5. Move history
 
 ### 12.2 Entities
-`Game` · `Board` · `Cell` · `Piece` · `Player` · `Move`
+- `ChessGame` — manages board, players, turns, move history, game status
+- `Board` — 8×8 Cell grid; setup, getCell, isPathClear
+- `Cell` — (x, y) + current piece (nullable)
+- `Piece` — abstract; each subclass (King/Queen/Rook/Bishop/Knight/Pawn) implements canMove()
+- `Player` — name + color (WHITE/BLACK)
+- `Move` — records player, piece, from, to, captured piece
 
 ### 12.3 Class Diagram
 ```
@@ -3096,7 +3144,10 @@ public class ChessDemo {
 5. Configurable board
 
 ### 13.2 Entities
-`Game` · `Board` · `Player` · `Dice`
+- `SnakeLadderGame` — runs game loop: roll → move → check snake/ladder → check win
+- `Board` — size + snake map (head→tail) + ladder map (bottom→top)
+- `Player` — name + current position
+- `Dice` — configurable number of dice + faces; returns random roll
 
 ### 13.3 Class Diagram
 ```
@@ -3282,7 +3333,12 @@ public class SnakeLadderDemo {
 5. Insufficient funds/cash handling
 
 ### 14.2 Entities
-`ATM` · `Card` · `Account` · `Transaction` · `CashDispenser` · `ATMState`
+- `ATM` — holds current state, card, account, cash dispenser chain
+- `Card` — card number + linked account number
+- `Account` — balance, PIN validation, withdraw/deposit
+- `CashHandler` — chain of responsibility; each denomination dispenses what it can, forwards remainder
+- `ATMState` — interface (Idle/CardInserted/Authenticated); handles insertCard/enterPin/withdraw/ejectCard
+- `BankService` — simulated bank, stores accounts by account number
 
 ### 14.3 Class Diagram
 ```
@@ -3594,7 +3650,13 @@ public class ATMDemo {
 5. Order tracking, notifications
 
 ### 15.2 Entities
-`User` · `Product` · `Cart` · `CartItem` · `Order` · `Payment` · `Coupon`
+- `Product` — id, name, price, category
+- `CartItem` — product + quantity; calculates subtotal
+- `Cart` — per-user item map; add/remove/update/getTotal/clear
+- `Coupon` — code, discount%, expiry; validates and applies discount
+- `Order` — created from cart at checkout; tracks status + notifies observers
+- `PaymentStrategy` — interface (Card/UPI/Wallet)
+- `OrderObserver` — notified on order status changes
 
 ### 15.3 Class Diagram
 ```
@@ -3861,7 +3923,12 @@ public class ShoppingCartDemo {
 5. Payment, ratings
 
 ### 16.2 Entities
-`User` · `Restaurant` · `MenuItem` · `Cart` · `Order` · `DeliveryAgent` · `Rating`
+- `Restaurant` — id, name, location, menu items, open/closed status
+- `MenuItem` — id, name, price, availability
+- `DeliveryAgent` — id, name, location, availability; assigned/released per order
+- `FoodOrder` — user + restaurant + items + agent + status (PLACED→DELIVERED)
+- `AgentAssignmentStrategy` — interface to pick agent (nearest, round-robin)
+- `Location` — lat/lng with distance calculation
 
 ### 16.3 Class Diagram
 ```
@@ -4111,7 +4178,11 @@ public class FoodDeliveryDemo {
 5. Notifications
 
 ### 17.2 Entities
-`Hotel` · `Room` · `RoomType` · `Booking` · `Guest` · `Payment`
+- `Hotel` — id, name, city, rooms; searches available rooms by type + date range
+- `Room` — id, type (Single/Double/Suite), price/night; checks date-range availability
+- `Guest` — id, name, email
+- `HotelBooking` — guest + room + check-in/out dates + total + status
+- `PricingStrategy` — interface (Standard × nights, PeakSeason × multiplier)
 
 ### 17.3 Class Diagram
 ```
@@ -4341,7 +4412,10 @@ public class HotelBookingDemo {
 5. Search by name
 
 ### 18.2 Entities
-`FileSystem` · `Entry` · `File` · `Directory`
+- `Entry` — abstract (Composite); name, parent, getSize(), getFullPath()
+- `File` — leaf; holds content string, size = content.length
+- `Directory` — composite; children map, addEntry, removeEntry, listEntries
+- `FileSystem` — root + currentDir; mkdir, touch, cd, ls, pwd, rm, find
 
 ### 18.3 Class Diagram
 ```
@@ -4613,7 +4687,11 @@ public class FileSystemDemo {
 5. Retry on failure
 
 ### 19.2 Entities
-`NotificationService` · `Notification` · `Channel` · `Template` · `UserPreference`
+- `Notification` — id, userId, message, channel, priority, status, retryCount
+- `NotificationChannel` — strategy interface (Email/SMS/Push); sends notification
+- `ChannelFactory` — creates channel by type
+- `Template` — id, name, body with {placeholders}; renders with params map
+- `UserPreference` — userId + preferred channel list
 
 ### 19.3 Class Diagram
 ```
@@ -4833,7 +4911,12 @@ public class NotificationDemo {
 5. Media sharing (text, image, file)
 
 ### 20.2 Entities
-`User` · `Message` · `Conversation` · `GroupConversation` · `ChatMediator`
+- `ChatUser` — id, name, online/offline status; receives messages
+- `Message` — id, sender, content, type (TEXT/IMAGE/FILE), status (SENT/DELIVERED/READ)
+- `Conversation` — abstract; holds message history + participant list
+- `OneToOneConversation` — two users
+- `GroupConversation` — N users + admin
+- `ChatMediator` — routes messages to all participants except sender
 
 ### 20.3 Class Diagram
 ```
@@ -5085,7 +5168,9 @@ public class ChatAppDemo {
 5. Job states: QUEUED → RUNNING → COMPLETED / FAILED
 
 ### 21.2 Entities
-`JobScheduler` · `Job` · `ExecutionStrategy` · `JobQueue`
+- `Job` — id, name, Runnable task, scheduledTime, priority; supports recurring via interval
+- `JobScheduler` — singleton; PriorityBlockingQueue + thread pool; polls ready jobs
+- `JobCompletionListener` — observer callback for completed/failed jobs
 
 ### 21.3 Class Diagram
 ```
@@ -5284,7 +5369,12 @@ public class JobSchedulerService {
 4. Configurable limit and window per API
 
 ### 22.2 Entities
-`RateLimiter` · `RateLimitStrategy` · `RateLimitConfig`
+- `RateLimitConfig` — maxRequests + window size in ms
+- `RateLimitStrategy` — interface; returns allow/deny per clientId
+- `FixedWindowStrategy` — counter per time window; resets on boundary
+- `SlidingWindowLogStrategy` — Deque of timestamps; removes old, counts recent
+- `TokenBucketStrategy` — tokens refill over time; each request consumes one
+- `RateLimiter` — wraps a strategy; isAllowed(clientId)
 
 ### 22.3 Class Diagram
 ```
@@ -5473,7 +5563,11 @@ public class RateLimiterService {
 5. Expense history
 
 ### 23.2 Entities
-`User` · `Group` · `Expense` · `Split` · `SplitStrategy` · `BalanceSheet`
+- `SplitwiseUser` — id, name, email
+- `SplitwiseGroup` — name, members, expenses
+- `Expense` — description, amount, paidBy, splits list, split type
+- `Split` — abstract (Equal/Exact/Percent); user + calculated amount
+- `BalanceSheet` — nested map tracking who owes whom; update + settle + print
 
 ### 23.3 Class Diagram
 ```
@@ -5711,7 +5805,12 @@ public class SplitwiseService {
 6. Rating system
 
 ### 24.2 Entities
-`Rider` · `Driver` · `Ride` · `FareStrategy` · `MatchingStrategy` · `RideState`
+- `Rider` — id, name, location, rating
+- `Driver` — id, name, location, vehicle, availability, rating
+- `Ride` — rider + driver + pickup/drop + fare + state; delegates to RideState
+- `FareStrategy` — interface (Standard: base+rate×distance, Surge: wraps base×multiplier)
+- `DriverMatchingStrategy` — interface (Nearest, HighestRated)
+- `RideState` — interface (Requested→Accepted→InProgress→Completed/Cancelled)
 
 ### 24.3 Class Diagram
 ```
@@ -5998,7 +6097,14 @@ public class RideService {
 5. Live scorecard display, match result
 
 ### 25.2 Entities
-`Match` · `Team` · `Player` · `Innings` · `Over` · `Ball` · `Scorecard`
+- `CricketMatch` — two teams, innings list, determines result
+- `Team` — name + player list
+- `CricketPlayer` — name
+- `Innings` — batting/bowling team, overs, runs, wickets, batsman/bowler score maps
+- `Over` — over number, bowler, balls list; complete after 6 legal deliveries
+- `Ball` — batsman, bowler, runs, wicket, extra type; knows if legal delivery
+- `BatsmanScore` — runs, balls faced, 4s, 6s, strike rate, out status
+- `BowlerScore` — balls bowled, runs conceded, wickets, economy
 
 ### 25.3 Class Diagram
 ```
@@ -6307,7 +6413,13 @@ public class CricketMatchService {
 6. Messaging
 
 ### 26.2 Entities
-`User` · `Profile` · `Connection` · `Post` · `Comment` · `Job` · `Application` · `Message`
+- `LinkedInUser` — id, name, profile, connections list, posts list
+- `LinkedInProfile` — headline, experiences, education, skills
+- `ConnectionRequest` — from/to users + status; accept() adds bidirectional connection
+- `Post` — author, content, likes list, comments, timestamp
+- `PostComment` — author + body + timestamp
+- `JobPosting` — company, title, description, required skills, applications
+- `JobApplication` — applicant + job + status (APPLIED→ACCEPTED/REJECTED)
 
 ### 26.3 Class Diagram
 ```
@@ -6621,7 +6733,10 @@ public class LinkedInService {
 5. Locker freed after pickup or expiry
 
 ### 27.2 Entities
-`LockerSystem` · `Locker` · `Package` · `OTP` · `LockerState`
+- `Locker` — id, size, locationId, state, current package, OTP; delegates to LockerState
+- `LockerPackage` — id, orderId, size, deliveredAt
+- `LockerState` — interface (Available/Occupied); handles assign/pickup/expire
+- `LockerAssignmentStrategy` — interface; finds smallest available locker that fits
 
 ### 27.3 Class Diagram
 ```
@@ -6848,7 +6963,12 @@ public class LockerService {
 5. Bulk booking, refund on cancellation
 
 ### 28.2 Entities
-`Event` · `Venue` · `Seat` · `SeatCategory` · `Booking` · `Waitlist` · `PricingStrategy`
+- `Event` — name, venue, dateTime, seats by category; finds available seats
+- `Venue` — id, name, city, capacity
+- `ConcertSeat` — id, category, basePrice, status; synchronized hold()
+- `ConcertBooking` — user + event + seats + total + status (HELD/CONFIRMED/CANCELLED)
+- `ConcertPricingStrategy` — interface (Fixed, DemandBased: price rises as seats drop)
+- `Waitlist` — per-category queue of observers; notifies next when seat freed
 
 ### 28.3 Class Diagram
 ```
@@ -7118,7 +7238,13 @@ public class ConcertTicketService {
 5. Portfolio tracking, trade history
 
 ### 29.2 Entities
-`User` · `Stock` · `Order` · `OrderBook` · `Trade` · `MatchingEngine` · `Portfolio`
+- `Stock` — symbol, name, last traded price
+- `StockOrder` — userId, stock, side (BUY/SELL), type (MARKET/LIMIT), price, qty; Comparable by price-time
+- `OrderBook` — per stock; buy orders in MaxHeap, sell orders in MinHeap
+- `MatchingEngine` — matches best buy ≥ best sell; creates Trades, handles partial fills
+- `Trade` — buy order + sell order + execution price + qty + timestamp
+- `Portfolio` — userId, holdings map (symbol→qty), realized P&L
+- `TradeObserver` — notified on each trade execution
 
 ### 29.3 Class Diagram
 ```
@@ -7414,7 +7540,13 @@ public class TradingService {
 6. Sprint board view
 
 ### 30.2 Entities
-`Project` · `Task` · `Sprint` · `User` · `Comment` · `ActivityLog`
+- `Project` — name, tasks, sprints, members
+- `TaskItem` — title, type, state, priority, assignee, subtasks, dependencies, comments, activity log; checks deps before transition
+- `TaskState` — interface (Todo→InProgress→InReview→Done); enforces valid transitions
+- `Sprint` — name, date range, tasks, status (PLANNED/ACTIVE/COMPLETED)
+- `TaskUser` — id, name, email
+- `TaskComment` — author + body + timestamp
+- `ActivityLog` — records who changed what field from old→new value + timestamp
 
 ### 30.3 Class Diagram
 ```
