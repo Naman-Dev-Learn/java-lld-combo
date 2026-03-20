@@ -5181,20 +5181,25 @@ ExecutionStrategy → OneTimeExecution, RecurringExecution
 
 ### 21.4 Java Code
 
+> **How it works — read the comments line by line:**
+
 ```java
 // ── Enums ──
 public enum JobStatus { QUEUED, RUNNING, COMPLETED, FAILED }
 
 // ── Job ──
+// A Job wraps a Runnable (the actual work) with scheduling metadata.
+// Implements Comparable so PriorityBlockingQueue knows how to sort jobs.
+// Sort order: earliest scheduledTime first → then lowest priority number first.
 public class Job implements Comparable<Job> {
     private String id;
     private String name;
-    private Runnable task;
-    private long scheduledTimeMs; // epoch ms
-    private int priority; // lower = higher priority
+    private Runnable task;          // the actual work — a lambda like () -> System.out.println("done")
+    private long scheduledTimeMs;   // epoch millis — when this job should run
+    private int priority;           // lower number = higher priority (0 = urgent, 10 = low)
     private JobStatus status;
-    private boolean recurring;
-    private long intervalMs;
+    private boolean recurring;      // if true, job reschedules itself after completion
+    private long intervalMs;        // gap between recurrences (e.g., 5000 = every 5 sec)
 
     public Job(String id, String name, Runnable task, long scheduledTimeMs, int priority) {
         this.id = id; this.name = name; this.task = task;
@@ -5202,20 +5207,28 @@ public class Job implements Comparable<Job> {
         this.status = JobStatus.QUEUED; this.recurring = false;
     }
 
+    // Builder-style: call job.asRecurring(5000) to make it repeat every 5s
     public Job asRecurring(long intervalMs) {
         this.recurring = true;
         this.intervalMs = intervalMs;
-        return this;
+        return this;  // returns this so you can chain: new Job(...).asRecurring(5000)
     }
 
+    // Called by scheduler to check: "Is it time to run this job yet?"
+    // Compares current wall-clock time against the job's scheduled time.
     public boolean isReady() { return System.currentTimeMillis() >= scheduledTimeMs; }
 
+    // After a recurring job completes, create the NEXT occurrence:
+    // same task, same priority, but scheduledTime shifted forward by intervalMs.
+    // Returns a brand-new Job object (the old one stays COMPLETED).
     public Job nextOccurrence() {
         if (!recurring) return null;
         return new Job(UUID.randomUUID().toString(), name, task,
                 scheduledTimeMs + intervalMs, priority).asRecurring(intervalMs);
     }
 
+    // PriorityBlockingQueue calls this to decide ordering.
+    // First compare by time (earlier = first). If same time, compare by priority (lower = first).
     @Override
     public int compareTo(Job other) {
         int timeCmp = Long.compare(this.scheduledTimeMs, other.scheduledTimeMs);
@@ -5227,87 +5240,121 @@ public class Job implements Comparable<Job> {
     public String getId() { return id; }
     public String getName() { return name; }
     public Runnable getTask() { return task; }
+    public long getScheduledTimeMs() { return scheduledTimeMs; }
+    public int getPriority() { return priority; }
     public JobStatus getStatus() { return status; }
     public void setStatus(JobStatus s) { this.status = s; }
     public boolean isRecurring() { return recurring; }
 }
 
-// ── Job Completion Listener (Observer) ──
+// ── Job Completion Listener (Observer Pattern) ──
+// Anyone who wants to know when a job finishes/fails implements this.
+// The scheduler calls these callbacks after each job execution.
 public interface JobCompletionListener {
     void onCompleted(Job job);
     void onFailed(Job job, Exception e);
 }
 
 // ── Job Scheduler ──
+// The brain of the system. Three components:
+//   1. PriorityBlockingQueue — sorted waiting area for jobs (Comparable decides order)
+//   2. Scheduler thread     — single thread that checks "is any job ready to run?"
+//   3. Worker thread pool   — N threads that actually execute jobs in parallel
+//
+// Flow: submit(job) → queue → scheduler thread polls → worker thread executes → listener notified
 public class JobScheduler {
-    private static volatile JobScheduler instance;
-    private final PriorityBlockingQueue<Job> queue;
-    private final ExecutorService workerPool;
-    private final List<JobCompletionListener> listeners;
-    private volatile boolean running;
+    private static volatile JobScheduler instance;       // Singleton — volatile for thread safety
+    private final PriorityBlockingQueue<Job> queue;      // Auto-sorted by Job.compareTo()
+    private final ExecutorService workerPool;            // Fixed thread pool (e.g., 4 threads)
+    private final List<JobCompletionListener> listeners; // Observers notified on job complete/fail
+    private volatile boolean running;                    // Flag to stop the scheduler gracefully
 
+    // Private constructor — Singleton pattern. Creates queue + thread pool.
     private JobScheduler(int poolSize) {
-        this.queue = new PriorityBlockingQueue<>();
-        this.workerPool = Executors.newFixedThreadPool(poolSize);
+        this.queue = new PriorityBlockingQueue<>();      // No capacity limit, auto-grows
+        this.workerPool = Executors.newFixedThreadPool(poolSize); // e.g., 4 worker threads
         this.listeners = new ArrayList<>();
         this.running = false;
     }
 
+    // Double-checked locking singleton. Thread-safe, lazy initialization.
     public static JobScheduler getInstance(int poolSize) {
-        if (instance == null) {
+        if (instance == null) {                          // First check — no lock (fast path)
             synchronized (JobScheduler.class) {
-                if (instance == null) instance = new JobScheduler(poolSize);
+                if (instance == null) {                  // Second check — with lock (safe path)
+                    instance = new JobScheduler(poolSize);
+                }
             }
         }
         return instance;
     }
 
+    // Register an observer to get callbacks when jobs complete or fail.
     public void addListener(JobCompletionListener listener) { listeners.add(listener); }
 
+    // Add a job to the queue. PriorityBlockingQueue automatically inserts it
+    // in the right position based on compareTo() (sorted by time, then priority).
     public void submit(Job job) {
-        queue.offer(job);
+        queue.offer(job);                                // offer() = non-blocking insert
         System.out.println("Job submitted: " + job.getName());
     }
 
+    // Starts the scheduler loop on a background daemon thread.
+    // This thread does NOT execute jobs — it only decides WHEN to hand them off to workers.
     public void start() {
         running = true;
         Thread schedulerThread = new Thread(() -> {
-            while (running) {
+            while (running) {                            // Loop until stop() is called
                 try {
-                    Job job = queue.peek();
-                    if (job != null && job.isReady()) {
-                        job = queue.poll();
-                        executeJob(job);
+                    Job job = queue.peek();              // Look at the first job WITHOUT removing it
+                    if (job != null && job.isReady()) {  // Is current time >= job's scheduled time?
+                        job = queue.poll();              // YES → remove from queue
+                        executeJob(job);                 // Hand off to a worker thread
                     } else {
-                        Thread.sleep(100); // poll interval
+                        Thread.sleep(100);               // NO → wait 100ms, then check again
+                        // Why 100ms? Trade-off: lower = more responsive, higher = less CPU waste.
+                        // In production, use DelayQueue.take() which blocks until a job is due.
                     }
                 } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    break;
+                    Thread.currentThread().interrupt();   // Restore interrupt flag
+                    break;                               // Exit the loop
                 }
             }
         });
-        schedulerThread.setDaemon(true);
-        schedulerThread.start();
+        schedulerThread.setDaemon(true);                 // Daemon = dies when main thread dies
+        schedulerThread.start();                         // Start the background loop
     }
 
+    // Hands a job to the worker thread pool for actual execution.
+    // The scheduler thread returns immediately — it does NOT wait for the job to finish.
     private void executeJob(Job job) {
         job.setStatus(JobStatus.RUNNING);
-        workerPool.submit(() -> {
+        workerPool.submit(() -> {                        // Runs on one of the N worker threads
             try {
-                job.getTask().run();
+                job.getTask().run();                     // ← THIS is where the actual work happens
                 job.setStatus(JobStatus.COMPLETED);
-                listeners.forEach(l -> l.onCompleted(job));
+                listeners.forEach(l -> l.onCompleted(job)); // Notify all observers: "job done"
 
-                // Reschedule if recurring
+                // If this is a recurring job, create the next occurrence and re-submit.
+                // e.g., job ran at t=1000 with interval=5000 → next runs at t=6000
                 if (job.isRecurring()) {
-                    Job next = job.nextOccurrence();
-                    if (next != null) submit(next);
+                    Job next = job.nextOccurrence();     // New Job with shifted scheduledTime
+                    if (next != null) submit(next);      // Back into the queue → cycle repeats
                 }
             } catch (Exception e) {
                 job.setStatus(JobStatus.FAILED);
-                listeners.forEach(l -> l.onFailed(job, e));
+                listeners.forEach(l -> l.onFailed(job, e)); // Notify observers: "job failed"
+                // Note: failed jobs are NOT retried. Add retry logic here if needed.
             }
+        });
+    }
+
+    // Graceful shutdown: stop the scheduler loop + shut down worker threads.
+    public void stop() {
+        running = false;                                 // Scheduler thread will exit its while loop
+        workerPool.shutdown();                           // No new tasks; finish in-progress ones
+    }
+}
         });
     }
 
